@@ -11,8 +11,6 @@
 """
 
 
-from __future__ import absolute_import
-
 # import models into model package
 from openapi_client.models.address_book_item import AddressBookItem
 from openapi_client.models.book_summary import BookSummary
