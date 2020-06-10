@@ -46,17 +46,16 @@ class Configuration(metaclass=TypeWithDefault):
     :param password: Password for HTTP basic authentication
     """
 
-    def __init__(self, host="https://www.deribit.com/api/v2",
-                 api_key={}, api_key_prefix={},
-                 username="", password=""):
-        """Constructor
-        """
-        self.host = host
-        """Default Base url
-        """
-        self.temp_folder_path = None
-        """Temp file folder for downloading files
-        """
+    def __init__(self, host="https://www.deribit.com/api/v2", api_key=None, api_key_prefix=None, username="",
+                 password=""):
+        if api_key is None:
+            api_key = {}
+        if api_key_prefix is None:
+            api_key_prefix = {}
+
+        self.host = host  # Default Base url
+        self.temp_folder_path = None  # Temp file folder for downloading files
+
         # Authentication Settings
         self.api_key = api_key
         """dict to store API key(s)
@@ -79,20 +78,10 @@ class Configuration(metaclass=TypeWithDefault):
         self.logger["package_logger"] = logging.getLogger("openapi_client")
         self.logger["urllib3_logger"] = logging.getLogger("urllib3")
         self.logger_format = '%(asctime)s %(levelname)s %(message)s'
-        """Log format
-        """
         self.logger_stream_handler = None
-        """Log stream handler
-        """
         self.logger_file_handler = None
-        """Log file handler
-        """
-        self.logger_file = None
-        """Debug file location
-        """
-        self.debug = False
-        """Debug switch
-        """
+        self.logger_file = None  # Debug file location
+        self.debug = False  # Debug switch
 
         self.verify_ssl = True
         """SSL/TLS verification
@@ -124,11 +113,7 @@ class Configuration(metaclass=TypeWithDefault):
         """Proxy URL
         """
         self.proxy_headers = None
-        """Proxy headers
-        """
         self.safe_chars_for_path_param = ''
-        """Safe chars for path_param
-        """
         self.retries = None
         """Adding retries to override urllib3 default value 3
         """
@@ -224,8 +209,7 @@ class Configuration(metaclass=TypeWithDefault):
         :param identifier: The identifier of apiKey.
         :return: The token for api key authentication.
         """
-        if (self.api_key.get(identifier) and
-                self.api_key_prefix.get(identifier)):
+        if self.api_key.get(identifier) and self.api_key_prefix.get(identifier):
             return self.api_key_prefix[identifier] + ' ' + self.api_key[identifier]  # noqa: E501
         elif self.api_key.get(identifier):
             return self.api_key[identifier]
@@ -235,9 +219,7 @@ class Configuration(metaclass=TypeWithDefault):
 
         :return: The token for basic HTTP authentication.
         """
-        return urllib3.util.make_headers(
-            basic_auth=self.username + ':' + self.password
-        ).get('authorization')
+        return urllib3.util.make_headers(basic_auth=self.username + ':' + self.password).get('authorization')
 
     def auth_settings(self):
         """Gets Auth Settings dict for api client.
@@ -283,12 +265,14 @@ class Configuration(metaclass=TypeWithDefault):
             }
         ]
 
-    def get_host_from_settings(self, index, variables={}):
+    def get_host_from_settings(self, index, variables=None):
         """Gets host URL based on the index and variables
         :param index: array index of the host settings
         :param variables: hash of variable and the corresponding value
         :return: URL based on host settings
         """
+        if variables is None:
+            variables = {}
 
         servers = self.get_host_settings()
 
@@ -304,10 +288,8 @@ class Configuration(metaclass=TypeWithDefault):
         # go through variable and assign a value
         for variable_name in server['variables']:
             if variable_name in variables:
-                if variables[variable_name] in server['variables'][
-                        variable_name]['enum_values']:
-                    url = url.replace("{" + variable_name + "}",
-                                      variables[variable_name])
+                if variables[variable_name] in server['variables'][variable_name]['enum_values']:
+                    url = url.replace("{" + variable_name + "}", variables[variable_name])
                 else:
                     raise ValueError(
                         "The variable `{}` in the host URL has invalid value {}. Must be {}."  # noqa: E501
@@ -316,8 +298,6 @@ class Configuration(metaclass=TypeWithDefault):
                             server['variables'][variable_name]['enum_values']))
             else:
                 # use default value
-                url = url.replace(
-                    "{" + variable_name + "}",
-                    server['variables'][variable_name]['default_value'])
+                url = url.replace("{" + variable_name + "}", server['variables'][variable_name]['default_value'])
 
         return url
