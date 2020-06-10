@@ -24,7 +24,7 @@ from openapi_client import rest
 from openapi_client.exceptions import ApiValueError
 
 
-class ApiClient(object):
+class ApiClient:
     """Generic API client for OpenAPI client library builds.
 
     OpenAPI generic API client. This client handles the client-
