@@ -3,39 +3,31 @@
 """
     Deribit API
 
-    #Overview  Deribit provides three different interfaces to access the API:  * [JSON-RPC over Websocket](#json-rpc) * [JSON-RPC over HTTP](#json-rpc) * [FIX](#fix-api) (Financial Information eXchange)  With the API Console you can use and test the JSON-RPC API, both via HTTP and  via Websocket. To visit the API console, go to __Account > API tab >  API Console tab.__   ##Naming Deribit tradeable assets or instruments use the following system of naming:  |Kind|Examples|Template|Comments| |----|--------|--------|--------| |Future|<code>BTC-25MAR16</code>, <code>BTC-5AUG16</code>|<code>BTC-DMMMYY</code>|<code>BTC</code> is currency, <code>DMMMYY</code> is expiration date, <code>D</code> stands for day of month (1 or 2 digits), <code>MMM</code> - month (3 first letters in English), <code>YY</code> stands for year.| |Perpetual|<code>BTC-PERPETUAL</code>                        ||Perpetual contract for currency <code>BTC</code>.| |Option|<code>BTC-25MAR16-420-C</code>, <code>BTC-5AUG16-580-P</code>|<code>BTC-DMMMYY-STRIKE-K</code>|<code>STRIKE</code> is option strike price in USD. Template <code>K</code> is option kind: <code>C</code> for call options or <code>P</code> for put options.|   # JSON-RPC JSON-RPC is a light-weight remote procedure call (RPC) protocol. The  [JSON-RPC specification](https://www.jsonrpc.org/specification) defines the data structures that are used for the messages that are exchanged between client and server, as well as the rules around their processing. JSON-RPC uses JSON (RFC 4627) as data format.  JSON-RPC is transport agnostic: it does not specify which transport mechanism must be used. The Deribit API supports both Websocket (preferred) and HTTP (with limitations: subscriptions are not supported over HTTP).  ## Request messages > An example of a request message:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 8066,     \"method\": \"public/ticker\",     \"params\": {         \"instrument\": \"BTC-24AUG18-6500-P\"     } } ```  According to the JSON-RPC sepcification the requests must be JSON objects with the following fields.  |Name|Type|Description| |----|----|-----------| |jsonrpc|string|The version of the JSON-RPC spec: \"2.0\"| |id|integer or string|An identifier of the request. If it is included, then the response will contain the same identifier| |method|string|The method to be invoked| |params|object|The parameters values for the method. The field names must match with the expected parameter names. The parameters that are expected are described in the documentation for the methods, below.|  <aside class=\"warning\"> The JSON-RPC specification describes two features that are currently not supported by the API:  <ul> <li>Specification of parameter values by position</li> <li>Batch requests</li> </ul>  </aside>   ## Response messages > An example of a response message:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 5239,     \"testnet\": false,     \"result\": [         {             \"currency\": \"BTC\",             \"currencyLong\": \"Bitcoin\",             \"minConfirmation\": 2,             \"txFee\": 0.0006,             \"isActive\": true,             \"coinType\": \"BITCOIN\",             \"baseAddress\": null         }     ],     \"usIn\": 1535043730126248,     \"usOut\": 1535043730126250,     \"usDiff\": 2 } ```  The JSON-RPC API always responds with a JSON object with the following fields.   |Name|Type|Description| |----|----|-----------| |id|integer|This is the same id that was sent in the request.| |result|any|If successful, the result of the API call. The format for the result is described with each method.| |error|error object|Only present if there was an error invoking the method. The error object is described below.| |testnet|boolean|Indicates whether the API in use is actually the test API.  <code>false</code> for production server, <code>true</code> for test server.| |usIn|integer|The timestamp when the requests was received (microseconds since the Unix epoch)| |usOut|integer|The timestamp when the response was sent (microseconds since the Unix epoch)| |usDiff|integer|The number of microseconds that was spent handling the request|  <aside class=\"notice\"> The fields <code>testnet</code>, <code>usIn</code>, <code>usOut</code> and <code>usDiff</code> are not part of the JSON-RPC standard.  <p>In order not to clutter the examples they will generally be omitted from the example code.</p> </aside>  > An example of a response with an error:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 8163,     \"error\": {         \"code\": 11050,         \"message\": \"bad_request\"     },     \"testnet\": false,     \"usIn\": 1535037392434763,     \"usOut\": 1535037392448119,     \"usDiff\": 13356 } ``` In case of an error the response message will contain the error field, with as value an object with the following with the following fields:  |Name|Type|Description |----|----|-----------| |code|integer|A number that indicates the kind of error.| |message|string|A short description that indicates the kind of error.| |data|any|Additional data about the error. This field may be omitted.|  ## Notifications  > An example of a notification:  ```json {     \"jsonrpc\": \"2.0\",     \"method\": \"subscription\",     \"params\": {         \"channel\": \"deribit_price_index.btc_usd\",         \"data\": {             \"timestamp\": 1535098298227,             \"price\": 6521.17,             \"index_name\": \"btc_usd\"         }     } } ```  API users can subscribe to certain types of notifications. This means that they will receive JSON-RPC notification-messages from the server when certain events occur, such as changes to the index price or changes to the order book for a certain instrument.   The API methods [public/subscribe](#public-subscribe) and [private/subscribe](#private-subscribe) are used to set up a subscription. Since HTTP does not support the sending of messages from server to client, these methods are only availble when using the Websocket transport mechanism.  At the moment of subscription a \"channel\" must be specified. The channel determines the type of events that will be received.  See [Subscriptions](#subscriptions) for more details about the channels.  In accordance with the JSON-RPC specification, the format of a notification  is that of a request message without an <code>id</code> field. The value of the <code>method</code> field will always be <code>\"subscription\"</code>. The <code>params</code> field will always be an object with 2 members: <code>channel</code> and <code>data</code>. The value of the <code>channel</code> member is the name of the channel (a string). The value of the <code>data</code> member is an object that contains data  that is specific for the channel.   ## Authentication  > An example of a JSON request with token:  ```json {     \"id\": 5647,     \"method\": \"private/get_subaccounts\",     \"params\": {         \"access_token\": \"67SVutDoVZSzkUStHSuk51WntMNBJ5mh5DYZhwzpiqDF\"     } } ```  The API consists of `public` and `private` methods. The public methods do not require authentication. The private methods use OAuth 2.0 authentication. This means that a valid OAuth access token must be included in the request, which can get achived by calling method [public/auth](#public-auth).  When the token was assigned to the user, it should be passed along, with other request parameters, back to the server:  |Connection type|Access token placement |----|-----------| |**Websocket**|Inside request JSON parameters, as an `access_token` field| |**HTTP (REST)**|Header `Authorization: bearer ```Token``` ` value|  ### Additional authorization method - basic user credentials  <span style=\"color:red\"><b> ! Not recommended - however, it could be useful for quick testing API</b></span></br>  Every `private` method could be accessed by providing, inside HTTP `Authorization: Basic XXX` header, values with user `ClientId` and assigned `ClientSecret` (both values can be found on the API page on the Deribit website) encoded with `Base64`:  <code>Authorization: Basic BASE64(`ClientId` + `:` + `ClientSecret`)</code>   ### Additional authorization method - Deribit signature credentials  The Derbit service provides dedicated authorization method, which harness user generated signature to increase security level for passing request data. Generated value is passed inside `Authorization` header, coded as:  <code>Authorization: deri-hmac-sha256 id=```ClientId```,ts=```Timestamp```,sig=```Signature```,nonce=```Nonce```</code>  where:  |Deribit credential|Description |----|-----------| |*ClientId*|Can be found on the API page on the Deribit website| |*Timestamp*|Time when the request was generated - given as **miliseconds**. It's valid for **60 seconds** since generation, after that time any request with an old timestamp will be rejected.| |*Signature*|Value for signature calculated as described below | |*Nonce*|Single usage, user generated initialization vector for the server token|  The signature is generated by the following formula:  <code> Signature = HEX_STRING( HMAC-SHA256( ClientSecret, StringToSign ) );</code></br>  <code> StringToSign =  Timestamp + \"\\n\" + Nonce + \"\\n\" + RequestData;</code></br>  <code> RequestData =  UPPERCASE(HTTP_METHOD())  + \"\\n\" + URI() + \"\\n\" + RequestBody + \"\\n\";</code></br>   e.g. (using shell with ```openssl``` tool):  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientId=AAAAAAAAAAA</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientSecret=ABCD</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Timestamp=$( date +%s000 )</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Nonce=$( cat /dev/urandom | tr -dc 'a-z0-9' | head -c8 )</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;URI=\"/api/v2/private/get_account_summary?currency=BTC\"</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;HttpMethod=GET</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Body=\"\"</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Signature=$( echo -ne \"${Timestamp}\\n${Nonce}\\n${HttpMethod}\\n${URI}\\n${Body}\\n\" | openssl sha256 -r -hmac \"$ClientSecret\" | cut -f1 -d' ' )</code></br></br> <code>&nbsp;&nbsp;&nbsp;&nbsp;echo $Signature</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;shell output> ea40d5e5e4fae235ab22b61da98121fbf4acdc06db03d632e23c66bcccb90d2c  (**WARNING**: Exact value depends on current timestamp and client credentials</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;curl -s -X ${HttpMethod} -H \"Authorization: deri-hmac-sha256 id=${ClientId},ts=${Timestamp},nonce=${Nonce},sig=${Signature}\" \"https://www.deribit.com${URI}\"</code></br></br>    ### Additional authorization method - signature credentials (WebSocket API)  When connecting through Websocket, user can request for authorization using ```client_credential``` method, which requires providing following parameters (as a part of JSON request):  |JSON parameter|Description |----|-----------| |*grant_type*|Must be **client_signature**| |*client_id*|Can be found on the API page on the Deribit website| |*timestamp*|Time when the request was generated - given as **miliseconds**. It's valid for **60 seconds** since generation, after that time any request with an old timestamp will be rejected.| |*signature*|Value for signature calculated as described below | |*nonce*|Single usage, user generated initialization vector for the server token| |*data*|**Optional** field, which contains any user specific value|  The signature is generated by the following formula:  <code> StringToSign =  Timestamp + \"\\n\" + Nonce + \"\\n\" + Data;</code></br>  <code> Signature = HEX_STRING( HMAC-SHA256( ClientSecret, StringToSign ) );</code></br>   e.g. (using shell with ```openssl``` tool):  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientId=AAAAAAAAAAA</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientSecret=ABCD</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Timestamp=$( date +%s000 ) # e.g. 1554883365000 </code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Nonce=$( cat /dev/urandom | tr -dc 'a-z0-9' | head -c8 ) # e.g. fdbmmz79 </code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Data=\"\"</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Signature=$( echo -ne \"${Timestamp}\\n${Nonce}\\n${Data}\\n\" | openssl sha256 -r -hmac \"$ClientSecret\" | cut -f1 -d' ' )</code></br></br> <code>&nbsp;&nbsp;&nbsp;&nbsp;echo $Signature</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;shell output> e20c9cd5639d41f8bbc88f4d699c4baf94a4f0ee320e9a116b72743c449eb994  (**WARNING**: Exact value depends on current timestamp and client credentials</code></br></br>   You can also check the signature value using some online tools like, e.g: [https://codebeautify.org/hmac-generator](https://codebeautify.org/hmac-generator) (but don't forget about adding *newline* after each part of the hashed text and remember that you **should use** it only with your **test credentials**).   Here's a sample JSON request created using the values from the example above:  <code> {                            </br> &nbsp;&nbsp;\"jsonrpc\" : \"2.0\",         </br> &nbsp;&nbsp;\"id\" : 9929,               </br> &nbsp;&nbsp;\"method\" : \"public/auth\",  </br> &nbsp;&nbsp;\"params\" :                 </br> &nbsp;&nbsp;{                        </br> &nbsp;&nbsp;&nbsp;&nbsp;\"grant_type\" : \"client_signature\",   </br> &nbsp;&nbsp;&nbsp;&nbsp;\"client_id\" : \"AAAAAAAAAAA\",         </br> &nbsp;&nbsp;&nbsp;&nbsp;\"timestamp\": \"1554883365000\",        </br> &nbsp;&nbsp;&nbsp;&nbsp;\"nonce\": \"fdbmmz79\",                 </br> &nbsp;&nbsp;&nbsp;&nbsp;\"data\": \"\",                          </br> &nbsp;&nbsp;&nbsp;&nbsp;\"signature\" : \"e20c9cd5639d41f8bbc88f4d699c4baf94a4f0ee320e9a116b72743c449eb994\"  </br> &nbsp;&nbsp;}                        </br> }                            </br> </code>   ### Access scope  When asking for `access token` user can provide the required access level (called `scope`) which defines what type of functionality he/she wants to use, and whether requests are only going to check for some data or also to update them.  Scopes are required and checked for `private` methods, so if you plan to use only `public` information you can stay with values assigned by default.  |Scope|Description |----|-----------| |*account:read*|Access to **account** methods - read only data| |*account:read_write*|Access to **account** methods - allows to manage account settings, add subaccounts, etc.| |*trade:read*|Access to **trade** methods - read only data| |*trade:read_write*|Access to **trade** methods - required to create and modify orders| |*wallet:read*|Access to **wallet** methods - read only data| |*wallet:read_write*|Access to **wallet** methods - allows to withdraw, generate new deposit address, etc.| |*wallet:none*, *account:none*, *trade:none*|Blocked access to specified functionality|    <span style=\"color:red\">**NOTICE:**</span> Depending on choosing an authentication method (```grant type```) some scopes could be narrowed by the server. e.g. when ```grant_type = client_credentials``` and ```scope = wallet:read_write``` it's modified by the server as ```scope = wallet:read```\"   ## JSON-RPC over websocket Websocket is the prefered transport mechanism for the JSON-RPC API, because it is faster and because it can support [subscriptions](#subscriptions) and [cancel on disconnect](#private-enable_cancel_on_disconnect). The code examples that can be found next to each of the methods show how websockets can be used from Python or Javascript/node.js.  ## JSON-RPC over HTTP Besides websockets it is also possible to use the API via HTTP. The code examples for 'shell' show how this can be done using curl. Note that subscriptions and cancel on disconnect are not supported via HTTP.  #Methods   # noqa: E501
+    #Overview  Deribit provides three different interfaces to access the API:  * [JSON-RPC over Websocket](#json-rpc) * [JSON-RPC over HTTP](#json-rpc) * [FIX](#fix-api) (Financial Information eXchange)  With the API Console you can use and test the JSON-RPC API, both via HTTP and  via Websocket. To visit the API console, go to __Account > API tab >  API Console tab.__   ##Naming Deribit tradeable assets or instruments use the following system of naming:  |Kind|Examples|Template|Comments| |----|--------|--------|--------| |Future|<code>BTC-25MAR16</code>, <code>BTC-5AUG16</code>|<code>BTC-DMMMYY</code>|<code>BTC</code> is currency, <code>DMMMYY</code> is expiration date, <code>D</code> stands for day of month (1 or 2 digits), <code>MMM</code> - month (3 first letters in English), <code>YY</code> stands for year.| |Perpetual|<code>BTC-PERPETUAL</code>                        ||Perpetual contract for currency <code>BTC</code>.| |Option|<code>BTC-25MAR16-420-C</code>, <code>BTC-5AUG16-580-P</code>|<code>BTC-DMMMYY-STRIKE-K</code>|<code>STRIKE</code> is option strike price in USD. Template <code>K</code> is option kind: <code>C</code> for call options or <code>P</code> for put options.|   # JSON-RPC JSON-RPC is a light-weight remote procedure call (RPC) protocol. The  [JSON-RPC specification](https://www.jsonrpc.org/specification) defines the data structures that are used for the messages that are exchanged between client and server, as well as the rules around their processing. JSON-RPC uses JSON (RFC 4627) as data format.  JSON-RPC is transport agnostic: it does not specify which transport mechanism must be used. The Deribit API supports both Websocket (preferred) and HTTP (with limitations: subscriptions are not supported over HTTP).  ## Request messages > An example of a request message:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 8066,     \"method\": \"public/ticker\",     \"params\": {         \"instrument\": \"BTC-24AUG18-6500-P\"     } } ```  According to the JSON-RPC sepcification the requests must be JSON objects with the following fields.  |Name|Type|Description| |----|----|-----------| |jsonrpc|string|The version of the JSON-RPC spec: \"2.0\"| |id|integer or string|An identifier of the request. If it is included, then the response will contain the same identifier| |method|string|The method to be invoked| |params|object|The parameters values for the method. The field names must match with the expected parameter names. The parameters that are expected are described in the documentation for the methods, below.|  <aside class=\"warning\"> The JSON-RPC specification describes two features that are currently not supported by the API:  <ul> <li>Specification of parameter values by position</li> <li>Batch requests</li> </ul>  </aside>   ## Response messages > An example of a response message:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 5239,     \"testnet\": false,     \"result\": [         {             \"currency\": \"BTC\",             \"currencyLong\": \"Bitcoin\",             \"minConfirmation\": 2,             \"txFee\": 0.0006,             \"isActive\": true,             \"coinType\": \"BITCOIN\",             \"baseAddress\": null         }     ],     \"usIn\": 1535043730126248,     \"usOut\": 1535043730126250,     \"usDiff\": 2 } ```  The JSON-RPC API always responds with a JSON object with the following fields.   |Name|Type|Description| |----|----|-----------| |id|integer|This is the same id that was sent in the request.| |result|any|If successful, the result of the API call. The format for the result is described with each method.| |error|error object|Only present if there was an error invoking the method. The error object is described below.| |testnet|boolean|Indicates whether the API in use is actually the test API.  <code>false</code> for production server, <code>true</code> for test server.| |usIn|integer|The timestamp when the requests was received (microseconds since the Unix epoch)| |usOut|integer|The timestamp when the response was sent (microseconds since the Unix epoch)| |usDiff|integer|The number of microseconds that was spent handling the request|  <aside class=\"notice\"> The fields <code>testnet</code>, <code>usIn</code>, <code>usOut</code> and <code>usDiff</code> are not part of the JSON-RPC standard.  <p>In order not to clutter the examples they will generally be omitted from the example code.</p> </aside>  > An example of a response with an error:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 8163,     \"error\": {         \"code\": 11050,         \"message\": \"bad_request\"     },     \"testnet\": false,     \"usIn\": 1535037392434763,     \"usOut\": 1535037392448119,     \"usDiff\": 13356 } ``` In case of an error the response message will contain the error field, with as value an object with the following with the following fields:  |Name|Type|Description |----|----|-----------| |code|integer|A number that indicates the kind of error.| |message|string|A short description that indicates the kind of error.| |data|any|Additional data about the error. This field may be omitted.|  ## Notifications  > An example of a notification:  ```json {     \"jsonrpc\": \"2.0\",     \"method\": \"subscription\",     \"params\": {         \"channel\": \"deribit_price_index.btc_usd\",         \"data\": {             \"timestamp\": 1535098298227,             \"price\": 6521.17,             \"index_name\": \"btc_usd\"         }     } } ```  API users can subscribe to certain types of notifications. This means that they will receive JSON-RPC notification-messages from the server when certain events occur, such as changes to the index price or changes to the order book for a certain instrument.   The API methods [public/subscribe](#public-subscribe) and [private/subscribe](#private-subscribe) are used to set up a subscription. Since HTTP does not support the sending of messages from server to client, these methods are only availble when using the Websocket transport mechanism.  At the moment of subscription a \"channel\" must be specified. The channel determines the type of events that will be received.  See [Subscriptions](#subscriptions) for more details about the channels.  In accordance with the JSON-RPC specification, the format of a notification  is that of a request message without an <code>id</code> field. The value of the <code>method</code> field will always be <code>\"subscription\"</code>. The <code>params</code> field will always be an object with 2 members: <code>channel</code> and <code>data</code>. The value of the <code>channel</code> member is the name of the channel (a string). The value of the <code>data</code> member is an object that contains data  that is specific for the channel.   ## Authentication  > An example of a JSON request with token:  ```json {     \"id\": 5647,     \"method\": \"private/get_subaccounts\",     \"params\": {         \"access_token\": \"67SVutDoVZSzkUStHSuk51WntMNBJ5mh5DYZhwzpiqDF\"     } } ```  The API consists of `public` and `private` methods. The public methods do not require authentication. The private methods use OAuth 2.0 authentication. This means that a valid OAuth access token must be included in the request, which can get achived by calling method [public/auth](#public-auth).  When the token was assigned to the user, it should be passed along, with other request parameters, back to the server:  |Connection type|Access token placement |----|-----------| |**Websocket**|Inside request JSON parameters, as an `access_token` field| |**HTTP (REST)**|Header `Authorization: bearer ```Token``` ` value|  ### Additional authorization method - basic user credentials  <span style=\"color:red\"><b> ! Not recommended - however, it could be useful for quick testing API</b></span></br>  Every `private` method could be accessed by providing, inside HTTP `Authorization: Basic XXX` header, values with user `ClientId` and assigned `ClientSecret` (both values can be found on the API page on the Deribit website) encoded with `Base64`:  <code>Authorization: Basic BASE64(`ClientId` + `:` + `ClientSecret`)</code>   ### Additional authorization method - Deribit signature credentials  The Derbit service provides dedicated authorization method, which harness user generated signature to increase security level for passing request data. Generated value is passed inside `Authorization` header, coded as:  <code>Authorization: deri-hmac-sha256 id=```ClientId```,ts=```Timestamp```,sig=```Signature```,nonce=```Nonce```</code>  where:  |Deribit credential|Description |----|-----------| |*ClientId*|Can be found on the API page on the Deribit website| |*Timestamp*|Time when the request was generated - given as **miliseconds**. It's valid for **60 seconds** since generation, after that time any request with an old timestamp will be rejected.| |*Signature*|Value for signature calculated as described below | |*Nonce*|Single usage, user generated initialization vector for the server token|  The signature is generated by the following formula:  <code> Signature = HEX_STRING( HMAC-SHA256( ClientSecret, StringToSign ) );</code></br>  <code> StringToSign =  Timestamp + \"\\n\" + Nonce + \"\\n\" + RequestData;</code></br>  <code> RequestData =  UPPERCASE(HTTP_METHOD())  + \"\\n\" + URI() + \"\\n\" + RequestBody + \"\\n\";</code></br>   e.g. (using shell with ```openssl``` tool):  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientId=AAAAAAAAAAA</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientSecret=ABCD</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Timestamp=$( date +%s000 )</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Nonce=$( cat /dev/urandom | tr -dc 'a-z0-9' | head -c8 )</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;URI=\"/api/v2/private/get_account_summary?currency=BTC\"</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;HttpMethod=GET</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Body=\"\"</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Signature=$( echo -ne \"${Timestamp}\\n${Nonce}\\n${HttpMethod}\\n${URI}\\n${Body}\\n\" | openssl sha256 -r -hmac \"$ClientSecret\" | cut -f1 -d' ' )</code></br></br> <code>&nbsp;&nbsp;&nbsp;&nbsp;echo $Signature</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;shell output> ea40d5e5e4fae235ab22b61da98121fbf4acdc06db03d632e23c66bcccb90d2c  (**WARNING**: Exact value depends on current timestamp and client credentials</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;curl -s -X ${HttpMethod} -H \"Authorization: deri-hmac-sha256 id=${ClientId},ts=${Timestamp},nonce=${Nonce},sig=${Signature}\" \"https://www.deribit.com${URI}\"</code></br></br>    ### Additional authorization method - signature credentials (WebSocket API)  When connecting through Websocket, user can request for authorization using ```client_credential``` method, which requires providing following parameters (as a part of JSON request):  |JSON parameter|Description |----|-----------| |*grant_type*|Must be **client_signature**| |*client_id*|Can be found on the API page on the Deribit website| |*timestamp*|Time when the request was generated - given as **miliseconds**. It's valid for **60 seconds** since generation, after that time any request with an old timestamp will be rejected.| |*signature*|Value for signature calculated as described below | |*nonce*|Single usage, user generated initialization vector for the server token| |*data*|**Optional** field, which contains any user specific value|  The signature is generated by the following formula:  <code> StringToSign =  Timestamp + \"\\n\" + Nonce + \"\\n\" + Data;</code></br>  <code> Signature = HEX_STRING( HMAC-SHA256( ClientSecret, StringToSign ) );</code></br>   e.g. (using shell with ```openssl``` tool):  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientId=AAAAAAAAAAA</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientSecret=ABCD</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Timestamp=$( date +%s000 ) # e.g. 1554883365000 </code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Nonce=$( cat /dev/urandom | tr -dc 'a-z0-9' | head -c8 ) # e.g. fdbmmz79 </code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Data=\"\"</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Signature=$( echo -ne \"${Timestamp}\\n${Nonce}\\n${Data}\\n\" | openssl sha256 -r -hmac \"$ClientSecret\" | cut -f1 -d' ' )</code></br></br> <code>&nbsp;&nbsp;&nbsp;&nbsp;echo $Signature</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;shell output> e20c9cd5639d41f8bbc88f4d699c4baf94a4f0ee320e9a116b72743c449eb994  (**WARNING**: Exact value depends on current timestamp and client credentials</code></br></br>   You can also check the signature value using some online tools like, e.g: [https://codebeautify.org/hmac-generator](https://codebeautify.org/hmac-generator) (but don't forget about adding *newline* after each part of the hashed text and remember that you **should use** it only with your **test credentials**).   Here's a sample JSON request created using the values from the example above:  <code> {                            </br> &nbsp;&nbsp;\"jsonrpc\" : \"2.0\",         </br> &nbsp;&nbsp;\"id\" : 9929,               </br> &nbsp;&nbsp;\"method\" : \"public/auth\",  </br> &nbsp;&nbsp;\"params\" :                 </br> &nbsp;&nbsp;{                        </br> &nbsp;&nbsp;&nbsp;&nbsp;\"grant_type\" : \"client_signature\",   </br> &nbsp;&nbsp;&nbsp;&nbsp;\"client_id\" : \"AAAAAAAAAAA\",         </br> &nbsp;&nbsp;&nbsp;&nbsp;\"timestamp\": \"1554883365000\",        </br> &nbsp;&nbsp;&nbsp;&nbsp;\"nonce\": \"fdbmmz79\",                 </br> &nbsp;&nbsp;&nbsp;&nbsp;\"data\": \"\",                          </br> &nbsp;&nbsp;&nbsp;&nbsp;\"signature\" : \"e20c9cd5639d41f8bbc88f4d699c4baf94a4f0ee320e9a116b72743c449eb994\"  </br> &nbsp;&nbsp;}                        </br> }                            </br> </code>   ### Access scope  When asking for `access token` user can provide the required access level (called `scope`) which defines what type of functionality he/she wants to use, and whether requests are only going to check for some data or also to update them.  Scopes are required and checked for `private` methods, so if you plan to use only `public` information you can stay with values assigned by default.  |Scope|Description |----|-----------| |*account:read*|Access to **account** methods - read only data| |*account:read_write*|Access to **account** methods - allows to manage account settings, add subaccounts, etc.| |*trade:read*|Access to **trade** methods - read only data| |*trade:read_write*|Access to **trade** methods - required to create and modify orders| |*wallet:read*|Access to **wallet** methods - read only data| |*wallet:read_write*|Access to **wallet** methods - allows to withdraw, generate new deposit address, etc.| |*wallet:none*, *account:none*, *trade:none*|Blocked access to specified functionality|    <span style=\"color:red\">**NOTICE:**</span> Depending on choosing an authentication method (```grant type```) some scopes could be narrowed by the server. e.g. when ```grant_type = client_credentials``` and ```scope = wallet:read_write``` it's modified by the server as ```scope = wallet:read```\"   ## JSON-RPC over websocket Websocket is the prefered transport mechanism for the JSON-RPC API, because it is faster and because it can support [subscriptions](#subscriptions) and [cancel on disconnect](#private-enable_cancel_on_disconnect). The code examples that can be found next to each of the methods show how websockets can be used from Python or Javascript/node.js.  ## JSON-RPC over HTTP Besides websockets it is also possible to use the API via HTTP. The code examples for 'shell' show how this can be done using curl. Note that subscriptions and cancel on disconnect are not supported via HTTP.  #Methods
 
     The version of the OpenAPI document: 2.0.0
     Generated by: https://openapi-generator.tech
 """
 
 
-import re  # noqa: F401
+import re
 
 # python 2 and python 3 compatibility library
 import six
 
 from openapi_client.api_client import ApiClient
-from openapi_client.exceptions import (
-    ApiTypeError,
-    ApiValueError
-)
+from openapi_client.exceptions import ApiTypeError, ApiValueError
 
 
-class PrivateApi(object):
-    """NOTE: This class is auto generated by OpenAPI Generator
-    Ref: https://openapi-generator.tech
-
-    Do not edit the class manually.
-    """
+class PrivateApi:
 
     def __init__(self, api_client=None):
         if api_client is None:
             api_client = ApiClient()
         self.api_client = api_client
 
-    def private_add_to_address_book_get(self, currency, type, address, name, **kwargs):  # noqa: E501
-        """Adds new entry to address book of given type  # noqa: E501
+    def private_add_to_address_book_get(self, currency, type, address, name, **kwargs):
+        """Adds new entry to address book of given type
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -60,10 +52,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_add_to_address_book_get_with_http_info(currency, type, address, name, **kwargs)  # noqa: E501
+        return self.private_add_to_address_book_get_with_http_info(currency, type, address, name, **kwargs)
 
-    def private_add_to_address_book_get_with_http_info(self, currency, type, address, name, **kwargs):  # noqa: E501
-        """Adds new entry to address book of given type  # noqa: E501
+    def private_add_to_address_book_get_with_http_info(self, currency, type, address, name, **kwargs):
+        """Adds new entry to address book of given type
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -92,7 +84,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'type', 'address', 'name', 'tfa']  # noqa: E501
+        all_params = ['currency', 'type', 'address', 'name', 'tfa']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -107,21 +99,21 @@ class PrivateApi(object):
             local_var_params[key] = val
         del local_var_params['kwargs']
         # verify the required parameter 'currency' is set
-        if ('currency' not in local_var_params or
-                local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_add_to_address_book_get`")  # noqa: E501
+        if 'currency' not in local_var_params or local_var_params['currency'] is None:
+            raise ApiValueError("Missing the required parameter `currency` when calling "
+                                "`private_add_to_address_book_get`")
         # verify the required parameter 'type' is set
-        if ('type' not in local_var_params or
-                local_var_params['type'] is None):
-            raise ApiValueError("Missing the required parameter `type` when calling `private_add_to_address_book_get`")  # noqa: E501
+        if 'type' not in local_var_params or local_var_params['type'] is None:
+            raise ApiValueError("Missing the required parameter `type` when calling "
+                                "`private_add_to_address_book_get`")
         # verify the required parameter 'address' is set
-        if ('address' not in local_var_params or
-                local_var_params['address'] is None):
-            raise ApiValueError("Missing the required parameter `address` when calling `private_add_to_address_book_get`")  # noqa: E501
+        if 'address' not in local_var_params or local_var_params['address'] is None:
+            raise ApiValueError("Missing the required parameter `address` when calling "
+                                "`private_add_to_address_book_get`")
         # verify the required parameter 'name' is set
-        if ('name' not in local_var_params or
-                local_var_params['name'] is None):
-            raise ApiValueError("Missing the required parameter `name` when calling `private_add_to_address_book_get`")  # noqa: E501
+        if 'name' not in local_var_params or local_var_params['name'] is None:
+            raise ApiValueError("Missing the required parameter `name` when calling "
+                                "`private_add_to_address_book_get`")
 
         collection_formats = {}
 
@@ -129,15 +121,15 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
         if 'address' in local_var_params:
-            query_params.append(('address', local_var_params['address']))  # noqa: E501
+            query_params.append(('address', local_var_params['address']))
         if 'name' in local_var_params:
-            query_params.append(('name', local_var_params['name']))  # noqa: E501
+            query_params.append(('name', local_var_params['name']))
         if 'tfa' in local_var_params:
-            query_params.append(('tfa', local_var_params['tfa']))  # noqa: E501
+            query_params.append(('tfa', local_var_params['tfa']))
 
         header_params = {}
 
@@ -147,10 +139,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/add_to_address_book', 'GET',
@@ -160,16 +152,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_buy_get(self, instrument_name, amount, **kwargs):  # noqa: E501
-        """Places a buy order for an instrument.  # noqa: E501
+    def private_buy_get(self, instrument_name, amount, **kwargs):
+        """Places a buy order for an instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -201,10 +193,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_buy_get_with_http_info(instrument_name, amount, **kwargs)  # noqa: E501
+        return self.private_buy_get_with_http_info(instrument_name, amount, **kwargs)
 
-    def private_buy_get_with_http_info(self, instrument_name, amount, **kwargs):  # noqa: E501
-        """Places a buy order for an instrument.  # noqa: E501
+    def private_buy_get_with_http_info(self, instrument_name, amount, **kwargs):
+        """Places a buy order for an instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -240,7 +232,8 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'amount', 'type', 'label', 'price', 'time_in_force', 'max_show', 'post_only', 'reduce_only', 'stop_price', 'trigger', 'advanced']  # noqa: E501
+        all_params = ['instrument_name', 'amount', 'type', 'label', 'price', 'time_in_force', 'max_show', 'post_only',
+                      'reduce_only', 'stop_price', 'trigger', 'advanced']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -257,11 +250,11 @@ class PrivateApi(object):
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_buy_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_buy_get`")
         # verify the required parameter 'amount' is set
         if ('amount' not in local_var_params or
                 local_var_params['amount'] is None):
-            raise ApiValueError("Missing the required parameter `amount` when calling `private_buy_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `amount` when calling `private_buy_get`")
 
         collection_formats = {}
 
@@ -269,29 +262,29 @@ class PrivateApi(object):
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'amount' in local_var_params:
-            query_params.append(('amount', local_var_params['amount']))  # noqa: E501
+            query_params.append(('amount', local_var_params['amount']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
         if 'label' in local_var_params:
-            query_params.append(('label', local_var_params['label']))  # noqa: E501
+            query_params.append(('label', local_var_params['label']))
         if 'price' in local_var_params:
-            query_params.append(('price', local_var_params['price']))  # noqa: E501
+            query_params.append(('price', local_var_params['price']))
         if 'time_in_force' in local_var_params:
-            query_params.append(('time_in_force', local_var_params['time_in_force']))  # noqa: E501
+            query_params.append(('time_in_force', local_var_params['time_in_force']))
         if 'max_show' in local_var_params:
-            query_params.append(('max_show', local_var_params['max_show']))  # noqa: E501
+            query_params.append(('max_show', local_var_params['max_show']))
         if 'post_only' in local_var_params:
-            query_params.append(('post_only', local_var_params['post_only']))  # noqa: E501
+            query_params.append(('post_only', local_var_params['post_only']))
         if 'reduce_only' in local_var_params:
-            query_params.append(('reduce_only', local_var_params['reduce_only']))  # noqa: E501
+            query_params.append(('reduce_only', local_var_params['reduce_only']))
         if 'stop_price' in local_var_params:
-            query_params.append(('stop_price', local_var_params['stop_price']))  # noqa: E501
+            query_params.append(('stop_price', local_var_params['stop_price']))
         if 'trigger' in local_var_params:
-            query_params.append(('trigger', local_var_params['trigger']))  # noqa: E501
+            query_params.append(('trigger', local_var_params['trigger']))
         if 'advanced' in local_var_params:
-            query_params.append(('advanced', local_var_params['advanced']))  # noqa: E501
+            query_params.append(('advanced', local_var_params['advanced']))
 
         header_params = {}
 
@@ -301,10 +294,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/buy', 'GET',
@@ -314,16 +307,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_cancel_all_by_currency_get(self, currency, **kwargs):  # noqa: E501
-        """Cancels all orders by currency, optionally filtered by instrument kind and/or order type.  # noqa: E501
+    def private_cancel_all_by_currency_get(self, currency, **kwargs):
+        """Cancels all orders by currency, optionally filtered by instrument kind and/or order type.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -346,10 +339,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_cancel_all_by_currency_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_cancel_all_by_currency_get_with_http_info(currency, **kwargs)
 
-    def private_cancel_all_by_currency_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Cancels all orders by currency, optionally filtered by instrument kind and/or order type.  # noqa: E501
+    def private_cancel_all_by_currency_get_with_http_info(self, currency, **kwargs):
+        """Cancels all orders by currency, optionally filtered by instrument kind and/or order type.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -376,7 +369,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'kind', 'type']  # noqa: E501
+        all_params = ['currency', 'kind', 'type']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -391,9 +384,9 @@ class PrivateApi(object):
             local_var_params[key] = val
         del local_var_params['kwargs']
         # verify the required parameter 'currency' is set
-        if ('currency' not in local_var_params or
-                local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_cancel_all_by_currency_get`")  # noqa: E501
+        if 'currency' not in local_var_params or local_var_params['currency'] is None:
+            raise ApiValueError(
+                "Missing the required parameter `currency` when calling `private_cancel_all_by_currency_get`")
 
         collection_formats = {}
 
@@ -401,11 +394,11 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'kind' in local_var_params:
-            query_params.append(('kind', local_var_params['kind']))  # noqa: E501
+            query_params.append(('kind', local_var_params['kind']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
 
         header_params = {}
 
@@ -415,10 +408,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/cancel_all_by_currency', 'GET',
@@ -428,16 +421,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_cancel_all_by_instrument_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Cancels all orders by instrument, optionally filtered by order type.  # noqa: E501
+    def private_cancel_all_by_instrument_get(self, instrument_name, **kwargs):
+        """Cancels all orders by instrument, optionally filtered by order type.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -459,10 +452,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_cancel_all_by_instrument_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.private_cancel_all_by_instrument_get_with_http_info(instrument_name, **kwargs)
 
-    def private_cancel_all_by_instrument_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Cancels all orders by instrument, optionally filtered by order type.  # noqa: E501
+    def private_cancel_all_by_instrument_get_with_http_info(self, instrument_name, **kwargs):
+        """Cancels all orders by instrument, optionally filtered by order type.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -488,7 +481,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'type']  # noqa: E501
+        all_params = ['instrument_name', 'type']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -503,9 +496,9 @@ class PrivateApi(object):
             local_var_params[key] = val
         del local_var_params['kwargs']
         # verify the required parameter 'instrument_name' is set
-        if ('instrument_name' not in local_var_params or
-                local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_cancel_all_by_instrument_get`")  # noqa: E501
+        if 'instrument_name' not in local_var_params or local_var_params['instrument_name'] is None:
+            raise ApiValueError(
+                "Missing the required parameter `instrument_name` when calling `private_cancel_all_by_instrument_get`")
 
         collection_formats = {}
 
@@ -513,9 +506,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
 
         header_params = {}
 
@@ -524,11 +517,10 @@ class PrivateApi(object):
 
         body_params = None
         # HTTP header `Accept`
-        header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+        header_params['Accept'] = self.api_client.select_header_accept(['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/cancel_all_by_instrument', 'GET',
@@ -538,16 +530,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_cancel_all_get(self, **kwargs):  # noqa: E501
-        """This method cancels all users orders and stop orders within all currencies and instrument kinds.  # noqa: E501
+    def private_cancel_all_get(self, **kwargs):
+        """This method cancels all users orders and stop orders within all currencies and instrument kinds.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -567,10 +559,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_cancel_all_get_with_http_info(**kwargs)  # noqa: E501
+        return self.private_cancel_all_get_with_http_info(**kwargs)
 
-    def private_cancel_all_get_with_http_info(self, **kwargs):  # noqa: E501
-        """This method cancels all users orders and stop orders within all currencies and instrument kinds.  # noqa: E501
+    def private_cancel_all_get_with_http_info(self, **kwargs):
+        """This method cancels all users orders and stop orders within all currencies and instrument kinds.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -594,7 +586,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = []  # noqa: E501
+        all_params = []
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -623,10 +615,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/cancel_all', 'GET',
@@ -636,16 +628,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_cancel_get(self, order_id, **kwargs):  # noqa: E501
-        """Cancel an order, specified by order id  # noqa: E501
+    def private_cancel_get(self, order_id, **kwargs):
+        """Cancel an order, specified by order id
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -666,10 +658,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_cancel_get_with_http_info(order_id, **kwargs)  # noqa: E501
+        return self.private_cancel_get_with_http_info(order_id, **kwargs)
 
-    def private_cancel_get_with_http_info(self, order_id, **kwargs):  # noqa: E501
-        """Cancel an order, specified by order id  # noqa: E501
+    def private_cancel_get_with_http_info(self, order_id, **kwargs):
+        """Cancel an order, specified by order id
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -694,7 +686,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['order_id']  # noqa: E501
+        all_params = ['order_id']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -711,7 +703,7 @@ class PrivateApi(object):
         # verify the required parameter 'order_id' is set
         if ('order_id' not in local_var_params or
                 local_var_params['order_id'] is None):
-            raise ApiValueError("Missing the required parameter `order_id` when calling `private_cancel_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `order_id` when calling `private_cancel_get`")
 
         collection_formats = {}
 
@@ -719,7 +711,7 @@ class PrivateApi(object):
 
         query_params = []
         if 'order_id' in local_var_params:
-            query_params.append(('order_id', local_var_params['order_id']))  # noqa: E501
+            query_params.append(('order_id', local_var_params['order_id']))
 
         header_params = {}
 
@@ -729,10 +721,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/cancel', 'GET',
@@ -742,16 +734,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_cancel_transfer_by_id_get(self, currency, id, **kwargs):  # noqa: E501
-        """Cancel transfer  # noqa: E501
+    def private_cancel_transfer_by_id_get(self, currency, id, **kwargs):
+        """Cancel transfer
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -774,10 +766,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_cancel_transfer_by_id_get_with_http_info(currency, id, **kwargs)  # noqa: E501
+        return self.private_cancel_transfer_by_id_get_with_http_info(currency, id, **kwargs)
 
-    def private_cancel_transfer_by_id_get_with_http_info(self, currency, id, **kwargs):  # noqa: E501
-        """Cancel transfer  # noqa: E501
+    def private_cancel_transfer_by_id_get_with_http_info(self, currency, id, **kwargs):
+        """Cancel transfer
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -804,7 +796,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'id', 'tfa']  # noqa: E501
+        all_params = ['currency', 'id', 'tfa']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -821,11 +813,11 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_cancel_transfer_by_id_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_cancel_transfer_by_id_get`")
         # verify the required parameter 'id' is set
         if ('id' not in local_var_params or
                 local_var_params['id'] is None):
-            raise ApiValueError("Missing the required parameter `id` when calling `private_cancel_transfer_by_id_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `id` when calling `private_cancel_transfer_by_id_get`")
 
         collection_formats = {}
 
@@ -833,11 +825,11 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'id' in local_var_params:
-            query_params.append(('id', local_var_params['id']))  # noqa: E501
+            query_params.append(('id', local_var_params['id']))
         if 'tfa' in local_var_params:
-            query_params.append(('tfa', local_var_params['tfa']))  # noqa: E501
+            query_params.append(('tfa', local_var_params['tfa']))
 
         header_params = {}
 
@@ -846,11 +838,10 @@ class PrivateApi(object):
 
         body_params = None
         # HTTP header `Accept`
-        header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+        header_params['Accept'] = self.api_client.select_header_accept(['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/cancel_transfer_by_id', 'GET',
@@ -860,16 +851,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_cancel_withdrawal_get(self, currency, id, **kwargs):  # noqa: E501
-        """Cancels withdrawal request  # noqa: E501
+    def private_cancel_withdrawal_get(self, currency, id, **kwargs):
+        """Cancels withdrawal request
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -891,10 +882,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_cancel_withdrawal_get_with_http_info(currency, id, **kwargs)  # noqa: E501
+        return self.private_cancel_withdrawal_get_with_http_info(currency, id, **kwargs)
 
-    def private_cancel_withdrawal_get_with_http_info(self, currency, id, **kwargs):  # noqa: E501
-        """Cancels withdrawal request  # noqa: E501
+    def private_cancel_withdrawal_get_with_http_info(self, currency, id, **kwargs):
+        """Cancels withdrawal request
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -920,7 +911,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'id']  # noqa: E501
+        all_params = ['currency', 'id']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -937,11 +928,11 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_cancel_withdrawal_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_cancel_withdrawal_get`")
         # verify the required parameter 'id' is set
         if ('id' not in local_var_params or
                 local_var_params['id'] is None):
-            raise ApiValueError("Missing the required parameter `id` when calling `private_cancel_withdrawal_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `id` when calling `private_cancel_withdrawal_get`")
 
         collection_formats = {}
 
@@ -949,9 +940,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'id' in local_var_params:
-            query_params.append(('id', local_var_params['id']))  # noqa: E501
+            query_params.append(('id', local_var_params['id']))
 
         header_params = {}
 
@@ -961,10 +952,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/cancel_withdrawal', 'GET',
@@ -974,16 +965,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_change_subaccount_name_get(self, sid, name, **kwargs):  # noqa: E501
-        """Change the user name for a subaccount  # noqa: E501
+    def private_change_subaccount_name_get(self, sid, name, **kwargs):
+        """Change the user name for a subaccount
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1005,10 +996,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_change_subaccount_name_get_with_http_info(sid, name, **kwargs)  # noqa: E501
+        return self.private_change_subaccount_name_get_with_http_info(sid, name, **kwargs)
 
-    def private_change_subaccount_name_get_with_http_info(self, sid, name, **kwargs):  # noqa: E501
-        """Change the user name for a subaccount  # noqa: E501
+    def private_change_subaccount_name_get_with_http_info(self, sid, name, **kwargs):
+        """Change the user name for a subaccount
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1034,7 +1025,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['sid', 'name']  # noqa: E501
+        all_params = ['sid', 'name']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1051,11 +1042,11 @@ class PrivateApi(object):
         # verify the required parameter 'sid' is set
         if ('sid' not in local_var_params or
                 local_var_params['sid'] is None):
-            raise ApiValueError("Missing the required parameter `sid` when calling `private_change_subaccount_name_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `sid` when calling `private_change_subaccount_name_get`")
         # verify the required parameter 'name' is set
         if ('name' not in local_var_params or
                 local_var_params['name'] is None):
-            raise ApiValueError("Missing the required parameter `name` when calling `private_change_subaccount_name_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `name` when calling `private_change_subaccount_name_get`")
 
         collection_formats = {}
 
@@ -1063,9 +1054,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'sid' in local_var_params:
-            query_params.append(('sid', local_var_params['sid']))  # noqa: E501
+            query_params.append(('sid', local_var_params['sid']))
         if 'name' in local_var_params:
-            query_params.append(('name', local_var_params['name']))  # noqa: E501
+            query_params.append(('name', local_var_params['name']))
 
         header_params = {}
 
@@ -1075,10 +1066,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/change_subaccount_name', 'GET',
@@ -1088,16 +1079,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_close_position_get(self, instrument_name, type, **kwargs):  # noqa: E501
-        """Makes closing position reduce only order .  # noqa: E501
+    def private_close_position_get(self, instrument_name, type, **kwargs):
+        """Makes closing position reduce only order .
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1120,10 +1111,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_close_position_get_with_http_info(instrument_name, type, **kwargs)  # noqa: E501
+        return self.private_close_position_get_with_http_info(instrument_name, type, **kwargs)
 
-    def private_close_position_get_with_http_info(self, instrument_name, type, **kwargs):  # noqa: E501
-        """Makes closing position reduce only order .  # noqa: E501
+    def private_close_position_get_with_http_info(self, instrument_name, type, **kwargs):
+        """Makes closing position reduce only order .
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1150,7 +1141,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'type', 'price']  # noqa: E501
+        all_params = ['instrument_name', 'type', 'price']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1167,11 +1158,11 @@ class PrivateApi(object):
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_close_position_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_close_position_get`")
         # verify the required parameter 'type' is set
         if ('type' not in local_var_params or
                 local_var_params['type'] is None):
-            raise ApiValueError("Missing the required parameter `type` when calling `private_close_position_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `type` when calling `private_close_position_get`")
 
         collection_formats = {}
 
@@ -1179,11 +1170,11 @@ class PrivateApi(object):
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
         if 'price' in local_var_params:
-            query_params.append(('price', local_var_params['price']))  # noqa: E501
+            query_params.append(('price', local_var_params['price']))
 
         header_params = {}
 
@@ -1193,10 +1184,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/close_position', 'GET',
@@ -1206,16 +1197,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_create_deposit_address_get(self, currency, **kwargs):  # noqa: E501
-        """Creates deposit address in currency  # noqa: E501
+    def private_create_deposit_address_get(self, currency, **kwargs):
+        """Creates deposit address in currency
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1236,10 +1227,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_create_deposit_address_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_create_deposit_address_get_with_http_info(currency, **kwargs)
 
-    def private_create_deposit_address_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Creates deposit address in currency  # noqa: E501
+    def private_create_deposit_address_get_with_http_info(self, currency, **kwargs):
+        """Creates deposit address in currency
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1264,7 +1255,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency']  # noqa: E501
+        all_params = ['currency']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1281,7 +1272,7 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_create_deposit_address_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_create_deposit_address_get`")
 
         collection_formats = {}
 
@@ -1289,7 +1280,7 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
 
         header_params = {}
 
@@ -1299,10 +1290,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/create_deposit_address', 'GET',
@@ -1312,16 +1303,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_create_subaccount_get(self, **kwargs):  # noqa: E501
-        """Create a new subaccount  # noqa: E501
+    def private_create_subaccount_get(self, **kwargs):
+        """Create a new subaccount
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1341,10 +1332,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_create_subaccount_get_with_http_info(**kwargs)  # noqa: E501
+        return self.private_create_subaccount_get_with_http_info(**kwargs)
 
-    def private_create_subaccount_get_with_http_info(self, **kwargs):  # noqa: E501
-        """Create a new subaccount  # noqa: E501
+    def private_create_subaccount_get_with_http_info(self, **kwargs):
+        """Create a new subaccount
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1368,7 +1359,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = []  # noqa: E501
+        all_params = []
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1397,10 +1388,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/create_subaccount', 'GET',
@@ -1410,16 +1401,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_disable_tfa_for_subaccount_get(self, sid, **kwargs):  # noqa: E501
-        """Disable two factor authentication for a subaccount.  # noqa: E501
+    def private_disable_tfa_for_subaccount_get(self, sid, **kwargs):
+        """Disable two factor authentication for a subaccount.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1440,10 +1431,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_disable_tfa_for_subaccount_get_with_http_info(sid, **kwargs)  # noqa: E501
+        return self.private_disable_tfa_for_subaccount_get_with_http_info(sid, **kwargs)
 
-    def private_disable_tfa_for_subaccount_get_with_http_info(self, sid, **kwargs):  # noqa: E501
-        """Disable two factor authentication for a subaccount.  # noqa: E501
+    def private_disable_tfa_for_subaccount_get_with_http_info(self, sid, **kwargs):
+        """Disable two factor authentication for a subaccount.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1468,7 +1459,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['sid']  # noqa: E501
+        all_params = ['sid']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1485,7 +1476,7 @@ class PrivateApi(object):
         # verify the required parameter 'sid' is set
         if ('sid' not in local_var_params or
                 local_var_params['sid'] is None):
-            raise ApiValueError("Missing the required parameter `sid` when calling `private_disable_tfa_for_subaccount_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `sid` when calling `private_disable_tfa_for_subaccount_get`")
 
         collection_formats = {}
 
@@ -1493,7 +1484,7 @@ class PrivateApi(object):
 
         query_params = []
         if 'sid' in local_var_params:
-            query_params.append(('sid', local_var_params['sid']))  # noqa: E501
+            query_params.append(('sid', local_var_params['sid']))
 
         header_params = {}
 
@@ -1503,10 +1494,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/disable_tfa_for_subaccount', 'GET',
@@ -1516,16 +1507,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_disable_tfa_with_recovery_code_get(self, password, code, **kwargs):  # noqa: E501
-        """Disables TFA with one time recovery code  # noqa: E501
+    def private_disable_tfa_with_recovery_code_get(self, password, code, **kwargs):
+        """Disables TFA with one time recovery code
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1547,10 +1538,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_disable_tfa_with_recovery_code_get_with_http_info(password, code, **kwargs)  # noqa: E501
+        return self.private_disable_tfa_with_recovery_code_get_with_http_info(password, code, **kwargs)
 
-    def private_disable_tfa_with_recovery_code_get_with_http_info(self, password, code, **kwargs):  # noqa: E501
-        """Disables TFA with one time recovery code  # noqa: E501
+    def private_disable_tfa_with_recovery_code_get_with_http_info(self, password, code, **kwargs):
+        """Disables TFA with one time recovery code
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1576,7 +1567,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['password', 'code']  # noqa: E501
+        all_params = ['password', 'code']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1593,11 +1584,11 @@ class PrivateApi(object):
         # verify the required parameter 'password' is set
         if ('password' not in local_var_params or
                 local_var_params['password'] is None):
-            raise ApiValueError("Missing the required parameter `password` when calling `private_disable_tfa_with_recovery_code_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `password` when calling `private_disable_tfa_with_recovery_code_get`")
         # verify the required parameter 'code' is set
         if ('code' not in local_var_params or
                 local_var_params['code'] is None):
-            raise ApiValueError("Missing the required parameter `code` when calling `private_disable_tfa_with_recovery_code_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `code` when calling `private_disable_tfa_with_recovery_code_get`")
 
         collection_formats = {}
 
@@ -1605,9 +1596,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'password' in local_var_params:
-            query_params.append(('password', local_var_params['password']))  # noqa: E501
+            query_params.append(('password', local_var_params['password']))
         if 'code' in local_var_params:
-            query_params.append(('code', local_var_params['code']))  # noqa: E501
+            query_params.append(('code', local_var_params['code']))
 
         header_params = {}
 
@@ -1617,10 +1608,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/disable_tfa_with_recovery_code', 'GET',
@@ -1630,16 +1621,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_edit_get(self, order_id, amount, price, **kwargs):  # noqa: E501
-        """Change price, amount and/or other properties of an order.  # noqa: E501
+    def private_edit_get(self, order_id, amount, price, **kwargs):
+        """Change price, amount and/or other properties of an order.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1665,10 +1656,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_edit_get_with_http_info(order_id, amount, price, **kwargs)  # noqa: E501
+        return self.private_edit_get_with_http_info(order_id, amount, price, **kwargs)
 
-    def private_edit_get_with_http_info(self, order_id, amount, price, **kwargs):  # noqa: E501
-        """Change price, amount and/or other properties of an order.  # noqa: E501
+    def private_edit_get_with_http_info(self, order_id, amount, price, **kwargs):
+        """Change price, amount and/or other properties of an order.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1698,7 +1689,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['order_id', 'amount', 'price', 'post_only', 'advanced', 'stop_price']  # noqa: E501
+        all_params = ['order_id', 'amount', 'price', 'post_only', 'advanced', 'stop_price']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1715,15 +1706,15 @@ class PrivateApi(object):
         # verify the required parameter 'order_id' is set
         if ('order_id' not in local_var_params or
                 local_var_params['order_id'] is None):
-            raise ApiValueError("Missing the required parameter `order_id` when calling `private_edit_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `order_id` when calling `private_edit_get`")
         # verify the required parameter 'amount' is set
         if ('amount' not in local_var_params or
                 local_var_params['amount'] is None):
-            raise ApiValueError("Missing the required parameter `amount` when calling `private_edit_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `amount` when calling `private_edit_get`")
         # verify the required parameter 'price' is set
         if ('price' not in local_var_params or
                 local_var_params['price'] is None):
-            raise ApiValueError("Missing the required parameter `price` when calling `private_edit_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `price` when calling `private_edit_get`")
 
         collection_formats = {}
 
@@ -1731,17 +1722,17 @@ class PrivateApi(object):
 
         query_params = []
         if 'order_id' in local_var_params:
-            query_params.append(('order_id', local_var_params['order_id']))  # noqa: E501
+            query_params.append(('order_id', local_var_params['order_id']))
         if 'amount' in local_var_params:
-            query_params.append(('amount', local_var_params['amount']))  # noqa: E501
+            query_params.append(('amount', local_var_params['amount']))
         if 'price' in local_var_params:
-            query_params.append(('price', local_var_params['price']))  # noqa: E501
+            query_params.append(('price', local_var_params['price']))
         if 'post_only' in local_var_params:
-            query_params.append(('post_only', local_var_params['post_only']))  # noqa: E501
+            query_params.append(('post_only', local_var_params['post_only']))
         if 'advanced' in local_var_params:
-            query_params.append(('advanced', local_var_params['advanced']))  # noqa: E501
+            query_params.append(('advanced', local_var_params['advanced']))
         if 'stop_price' in local_var_params:
-            query_params.append(('stop_price', local_var_params['stop_price']))  # noqa: E501
+            query_params.append(('stop_price', local_var_params['stop_price']))
 
         header_params = {}
 
@@ -1751,10 +1742,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/edit', 'GET',
@@ -1764,16 +1755,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_account_summary_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieves user account summary.  # noqa: E501
+    def private_get_account_summary_get(self, currency, **kwargs):
+        """Retrieves user account summary.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1795,10 +1786,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_account_summary_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_get_account_summary_get_with_http_info(currency, **kwargs)
 
-    def private_get_account_summary_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieves user account summary.  # noqa: E501
+    def private_get_account_summary_get_with_http_info(self, currency, **kwargs):
+        """Retrieves user account summary.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1824,7 +1815,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'extended']  # noqa: E501
+        all_params = ['currency', 'extended']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1841,7 +1832,7 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_account_summary_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_account_summary_get`")
 
         collection_formats = {}
 
@@ -1849,9 +1840,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'extended' in local_var_params:
-            query_params.append(('extended', local_var_params['extended']))  # noqa: E501
+            query_params.append(('extended', local_var_params['extended']))
 
         header_params = {}
 
@@ -1861,10 +1852,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_account_summary', 'GET',
@@ -1874,16 +1865,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_address_book_get(self, currency, type, **kwargs):  # noqa: E501
-        """Retrieves address book of given type  # noqa: E501
+    def private_get_address_book_get(self, currency, type, **kwargs):
+        """Retrieves address book of given type
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1905,10 +1896,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_address_book_get_with_http_info(currency, type, **kwargs)  # noqa: E501
+        return self.private_get_address_book_get_with_http_info(currency, type, **kwargs)
 
-    def private_get_address_book_get_with_http_info(self, currency, type, **kwargs):  # noqa: E501
-        """Retrieves address book of given type  # noqa: E501
+    def private_get_address_book_get_with_http_info(self, currency, type, **kwargs):
+        """Retrieves address book of given type
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1934,7 +1925,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'type']  # noqa: E501
+        all_params = ['currency', 'type']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1951,11 +1942,11 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_address_book_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_address_book_get`")
         # verify the required parameter 'type' is set
         if ('type' not in local_var_params or
                 local_var_params['type'] is None):
-            raise ApiValueError("Missing the required parameter `type` when calling `private_get_address_book_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `type` when calling `private_get_address_book_get`")
 
         collection_formats = {}
 
@@ -1963,9 +1954,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
 
         header_params = {}
 
@@ -1975,10 +1966,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_address_book', 'GET',
@@ -1988,16 +1979,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_current_deposit_address_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieve deposit address for currency  # noqa: E501
+    def private_get_current_deposit_address_get(self, currency, **kwargs):
+        """Retrieve deposit address for currency
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2018,10 +2009,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_current_deposit_address_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_get_current_deposit_address_get_with_http_info(currency, **kwargs)
 
-    def private_get_current_deposit_address_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieve deposit address for currency  # noqa: E501
+    def private_get_current_deposit_address_get_with_http_info(self, currency, **kwargs):
+        """Retrieve deposit address for currency
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2046,7 +2037,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency']  # noqa: E501
+        all_params = ['currency']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2063,7 +2054,7 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_current_deposit_address_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_current_deposit_address_get`")
 
         collection_formats = {}
 
@@ -2071,7 +2062,7 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
 
         header_params = {}
 
@@ -2081,10 +2072,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_current_deposit_address', 'GET',
@@ -2094,16 +2085,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_deposits_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieve the latest users deposits  # noqa: E501
+    def private_get_deposits_get(self, currency, **kwargs):
+        """Retrieve the latest users deposits
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2126,10 +2117,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_deposits_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_get_deposits_get_with_http_info(currency, **kwargs)
 
-    def private_get_deposits_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieve the latest users deposits  # noqa: E501
+    def private_get_deposits_get_with_http_info(self, currency, **kwargs):
+        """Retrieve the latest users deposits
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2156,7 +2147,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'count', 'offset']  # noqa: E501
+        all_params = ['currency', 'count', 'offset']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2173,7 +2164,7 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_deposits_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_deposits_get`")
 
         collection_formats = {}
 
@@ -2181,11 +2172,11 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'offset' in local_var_params:
-            query_params.append(('offset', local_var_params['offset']))  # noqa: E501
+            query_params.append(('offset', local_var_params['offset']))
 
         header_params = {}
 
@@ -2195,10 +2186,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_deposits', 'GET',
@@ -2208,16 +2199,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_email_language_get(self, **kwargs):  # noqa: E501
-        """Retrieves the language to be used for emails.  # noqa: E501
+    def private_get_email_language_get(self, **kwargs):
+        """Retrieves the language to be used for emails.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2237,10 +2228,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_email_language_get_with_http_info(**kwargs)  # noqa: E501
+        return self.private_get_email_language_get_with_http_info(**kwargs)
 
-    def private_get_email_language_get_with_http_info(self, **kwargs):  # noqa: E501
-        """Retrieves the language to be used for emails.  # noqa: E501
+    def private_get_email_language_get_with_http_info(self, **kwargs):
+        """Retrieves the language to be used for emails.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2264,7 +2255,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = []  # noqa: E501
+        all_params = []
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2293,10 +2284,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_email_language', 'GET',
@@ -2306,16 +2297,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_margins_get(self, instrument_name, amount, price, **kwargs):  # noqa: E501
-        """Get margins for given instrument, amount and price.  # noqa: E501
+    def private_get_margins_get(self, instrument_name, amount, price, **kwargs):
+        """Get margins for given instrument, amount and price.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2338,10 +2329,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_margins_get_with_http_info(instrument_name, amount, price, **kwargs)  # noqa: E501
+        return self.private_get_margins_get_with_http_info(instrument_name, amount, price, **kwargs)
 
-    def private_get_margins_get_with_http_info(self, instrument_name, amount, price, **kwargs):  # noqa: E501
-        """Get margins for given instrument, amount and price.  # noqa: E501
+    def private_get_margins_get_with_http_info(self, instrument_name, amount, price, **kwargs):
+        """Get margins for given instrument, amount and price.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2368,7 +2359,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'amount', 'price']  # noqa: E501
+        all_params = ['instrument_name', 'amount', 'price']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2385,15 +2376,15 @@ class PrivateApi(object):
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_margins_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_margins_get`")
         # verify the required parameter 'amount' is set
         if ('amount' not in local_var_params or
                 local_var_params['amount'] is None):
-            raise ApiValueError("Missing the required parameter `amount` when calling `private_get_margins_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `amount` when calling `private_get_margins_get`")
         # verify the required parameter 'price' is set
         if ('price' not in local_var_params or
                 local_var_params['price'] is None):
-            raise ApiValueError("Missing the required parameter `price` when calling `private_get_margins_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `price` when calling `private_get_margins_get`")
 
         collection_formats = {}
 
@@ -2401,11 +2392,11 @@ class PrivateApi(object):
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'amount' in local_var_params:
-            query_params.append(('amount', local_var_params['amount']))  # noqa: E501
+            query_params.append(('amount', local_var_params['amount']))
         if 'price' in local_var_params:
-            query_params.append(('price', local_var_params['price']))  # noqa: E501
+            query_params.append(('price', local_var_params['price']))
 
         header_params = {}
 
@@ -2415,10 +2406,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_margins', 'GET',
@@ -2428,16 +2419,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_new_announcements_get(self, **kwargs):  # noqa: E501
-        """Retrieves announcements that have not been marked read by the user.  # noqa: E501
+    def private_get_new_announcements_get(self, **kwargs):
+        """Retrieves announcements that have not been marked read by the user.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2457,10 +2448,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_new_announcements_get_with_http_info(**kwargs)  # noqa: E501
+        return self.private_get_new_announcements_get_with_http_info(**kwargs)
 
-    def private_get_new_announcements_get_with_http_info(self, **kwargs):  # noqa: E501
-        """Retrieves announcements that have not been marked read by the user.  # noqa: E501
+    def private_get_new_announcements_get_with_http_info(self, **kwargs):
+        """Retrieves announcements that have not been marked read by the user.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2484,7 +2475,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = []  # noqa: E501
+        all_params = []
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2513,10 +2504,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_new_announcements', 'GET',
@@ -2526,16 +2517,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_open_orders_by_currency_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieves list of user's open orders.  # noqa: E501
+    def private_get_open_orders_by_currency_get(self, currency, **kwargs):
+        """Retrieves list of user's open orders.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2558,10 +2549,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_open_orders_by_currency_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_get_open_orders_by_currency_get_with_http_info(currency, **kwargs)
 
-    def private_get_open_orders_by_currency_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieves list of user's open orders.  # noqa: E501
+    def private_get_open_orders_by_currency_get_with_http_info(self, currency, **kwargs):
+        """Retrieves list of user's open orders.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2588,7 +2579,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'kind', 'type']  # noqa: E501
+        all_params = ['currency', 'kind', 'type']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2605,7 +2596,7 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_open_orders_by_currency_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_open_orders_by_currency_get`")
 
         collection_formats = {}
 
@@ -2613,11 +2604,11 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'kind' in local_var_params:
-            query_params.append(('kind', local_var_params['kind']))  # noqa: E501
+            query_params.append(('kind', local_var_params['kind']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
 
         header_params = {}
 
@@ -2627,10 +2618,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_open_orders_by_currency', 'GET',
@@ -2640,16 +2631,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_open_orders_by_instrument_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves list of user's open orders within given Instrument.  # noqa: E501
+    def private_get_open_orders_by_instrument_get(self, instrument_name, **kwargs):
+        """Retrieves list of user's open orders within given Instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2671,10 +2662,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_open_orders_by_instrument_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.private_get_open_orders_by_instrument_get_with_http_info(instrument_name, **kwargs)
 
-    def private_get_open_orders_by_instrument_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves list of user's open orders within given Instrument.  # noqa: E501
+    def private_get_open_orders_by_instrument_get_with_http_info(self, instrument_name, **kwargs):
+        """Retrieves list of user's open orders within given Instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2700,7 +2691,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'type']  # noqa: E501
+        all_params = ['instrument_name', 'type']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2717,7 +2708,7 @@ class PrivateApi(object):
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_open_orders_by_instrument_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_open_orders_by_instrument_get`")
 
         collection_formats = {}
 
@@ -2725,9 +2716,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
 
         header_params = {}
 
@@ -2737,10 +2728,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_open_orders_by_instrument', 'GET',
@@ -2750,16 +2741,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_order_history_by_currency_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieves history of orders that have been partially or fully filled.  # noqa: E501
+    def private_get_order_history_by_currency_get(self, currency, **kwargs):
+        """Retrieves history of orders that have been partially or fully filled.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2785,10 +2776,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_order_history_by_currency_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_get_order_history_by_currency_get_with_http_info(currency, **kwargs)
 
-    def private_get_order_history_by_currency_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieves history of orders that have been partially or fully filled.  # noqa: E501
+    def private_get_order_history_by_currency_get_with_http_info(self, currency, **kwargs):
+        """Retrieves history of orders that have been partially or fully filled.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2818,7 +2809,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'kind', 'count', 'offset', 'include_old', 'include_unfilled']  # noqa: E501
+        all_params = ['currency', 'kind', 'count', 'offset', 'include_old', 'include_unfilled']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2835,7 +2826,7 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_order_history_by_currency_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_order_history_by_currency_get`")
 
         collection_formats = {}
 
@@ -2843,17 +2834,17 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'kind' in local_var_params:
-            query_params.append(('kind', local_var_params['kind']))  # noqa: E501
+            query_params.append(('kind', local_var_params['kind']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'offset' in local_var_params:
-            query_params.append(('offset', local_var_params['offset']))  # noqa: E501
+            query_params.append(('offset', local_var_params['offset']))
         if 'include_old' in local_var_params:
-            query_params.append(('include_old', local_var_params['include_old']))  # noqa: E501
+            query_params.append(('include_old', local_var_params['include_old']))
         if 'include_unfilled' in local_var_params:
-            query_params.append(('include_unfilled', local_var_params['include_unfilled']))  # noqa: E501
+            query_params.append(('include_unfilled', local_var_params['include_unfilled']))
 
         header_params = {}
 
@@ -2863,10 +2854,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_order_history_by_currency', 'GET',
@@ -2876,16 +2867,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_order_history_by_instrument_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves history of orders that have been partially or fully filled.  # noqa: E501
+    def private_get_order_history_by_instrument_get(self, instrument_name, **kwargs):
+        """Retrieves history of orders that have been partially or fully filled.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2910,10 +2901,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_order_history_by_instrument_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.private_get_order_history_by_instrument_get_with_http_info(instrument_name, **kwargs)
 
-    def private_get_order_history_by_instrument_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves history of orders that have been partially or fully filled.  # noqa: E501
+    def private_get_order_history_by_instrument_get_with_http_info(self, instrument_name, **kwargs):
+        """Retrieves history of orders that have been partially or fully filled.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2942,7 +2933,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'count', 'offset', 'include_old', 'include_unfilled']  # noqa: E501
+        all_params = ['instrument_name', 'count', 'offset', 'include_old', 'include_unfilled']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2959,7 +2950,7 @@ class PrivateApi(object):
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_order_history_by_instrument_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_order_history_by_instrument_get`")
 
         collection_formats = {}
 
@@ -2967,15 +2958,15 @@ class PrivateApi(object):
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'offset' in local_var_params:
-            query_params.append(('offset', local_var_params['offset']))  # noqa: E501
+            query_params.append(('offset', local_var_params['offset']))
         if 'include_old' in local_var_params:
-            query_params.append(('include_old', local_var_params['include_old']))  # noqa: E501
+            query_params.append(('include_old', local_var_params['include_old']))
         if 'include_unfilled' in local_var_params:
-            query_params.append(('include_unfilled', local_var_params['include_unfilled']))  # noqa: E501
+            query_params.append(('include_unfilled', local_var_params['include_unfilled']))
 
         header_params = {}
 
@@ -2985,10 +2976,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_order_history_by_instrument', 'GET',
@@ -2998,16 +2989,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_order_margin_by_ids_get(self, ids, **kwargs):  # noqa: E501
-        """Retrieves initial margins of given orders  # noqa: E501
+    def private_get_order_margin_by_ids_get(self, ids, **kwargs):
+        """Retrieves initial margins of given orders
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3028,10 +3019,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_order_margin_by_ids_get_with_http_info(ids, **kwargs)  # noqa: E501
+        return self.private_get_order_margin_by_ids_get_with_http_info(ids, **kwargs)
 
-    def private_get_order_margin_by_ids_get_with_http_info(self, ids, **kwargs):  # noqa: E501
-        """Retrieves initial margins of given orders  # noqa: E501
+    def private_get_order_margin_by_ids_get_with_http_info(self, ids, **kwargs):
+        """Retrieves initial margins of given orders
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3056,7 +3047,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['ids']  # noqa: E501
+        all_params = ['ids']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -3073,7 +3064,7 @@ class PrivateApi(object):
         # verify the required parameter 'ids' is set
         if ('ids' not in local_var_params or
                 local_var_params['ids'] is None):
-            raise ApiValueError("Missing the required parameter `ids` when calling `private_get_order_margin_by_ids_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `ids` when calling `private_get_order_margin_by_ids_get`")
 
         collection_formats = {}
 
@@ -3081,8 +3072,8 @@ class PrivateApi(object):
 
         query_params = []
         if 'ids' in local_var_params:
-            query_params.append(('ids', local_var_params['ids']))  # noqa: E501
-            collection_formats['ids'] = 'multi'  # noqa: E501
+            query_params.append(('ids', local_var_params['ids']))
+            collection_formats['ids'] = 'multi'
 
         header_params = {}
 
@@ -3092,10 +3083,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_order_margin_by_ids', 'GET',
@@ -3105,16 +3096,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_order_state_get(self, order_id, **kwargs):  # noqa: E501
-        """Retrieve the current state of an order.  # noqa: E501
+    def private_get_order_state_get(self, order_id, **kwargs):
+        """Retrieve the current state of an order.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3135,10 +3126,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_order_state_get_with_http_info(order_id, **kwargs)  # noqa: E501
+        return self.private_get_order_state_get_with_http_info(order_id, **kwargs)
 
-    def private_get_order_state_get_with_http_info(self, order_id, **kwargs):  # noqa: E501
-        """Retrieve the current state of an order.  # noqa: E501
+    def private_get_order_state_get_with_http_info(self, order_id, **kwargs):
+        """Retrieve the current state of an order.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3163,7 +3154,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['order_id']  # noqa: E501
+        all_params = ['order_id']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -3180,7 +3171,7 @@ class PrivateApi(object):
         # verify the required parameter 'order_id' is set
         if ('order_id' not in local_var_params or
                 local_var_params['order_id'] is None):
-            raise ApiValueError("Missing the required parameter `order_id` when calling `private_get_order_state_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `order_id` when calling `private_get_order_state_get`")
 
         collection_formats = {}
 
@@ -3188,7 +3179,7 @@ class PrivateApi(object):
 
         query_params = []
         if 'order_id' in local_var_params:
-            query_params.append(('order_id', local_var_params['order_id']))  # noqa: E501
+            query_params.append(('order_id', local_var_params['order_id']))
 
         header_params = {}
 
@@ -3198,10 +3189,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_order_state', 'GET',
@@ -3211,16 +3202,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_position_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieve user position.  # noqa: E501
+    def private_get_position_get(self, instrument_name, **kwargs):
+        """Retrieve user position.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3241,10 +3232,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_position_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.private_get_position_get_with_http_info(instrument_name, **kwargs)
 
-    def private_get_position_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieve user position.  # noqa: E501
+    def private_get_position_get_with_http_info(self, instrument_name, **kwargs):
+        """Retrieve user position.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3269,7 +3260,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['instrument_name']  # noqa: E501
+        all_params = ['instrument_name']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -3286,7 +3277,7 @@ class PrivateApi(object):
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_position_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_position_get`")
 
         collection_formats = {}
 
@@ -3294,7 +3285,7 @@ class PrivateApi(object):
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
 
         header_params = {}
 
@@ -3304,10 +3295,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_position', 'GET',
@@ -3317,16 +3308,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_positions_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieve user positions.  # noqa: E501
+    def private_get_positions_get(self, currency, **kwargs):
+        """Retrieve user positions.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3348,10 +3339,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_positions_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_get_positions_get_with_http_info(currency, **kwargs)
 
-    def private_get_positions_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieve user positions.  # noqa: E501
+    def private_get_positions_get_with_http_info(self, currency, **kwargs):
+        """Retrieve user positions.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3377,7 +3368,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'kind']  # noqa: E501
+        all_params = ['currency', 'kind']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -3394,7 +3385,7 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_positions_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_positions_get`")
 
         collection_formats = {}
 
@@ -3402,9 +3393,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'kind' in local_var_params:
-            query_params.append(('kind', local_var_params['kind']))  # noqa: E501
+            query_params.append(('kind', local_var_params['kind']))
 
         header_params = {}
 
@@ -3414,10 +3405,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_positions', 'GET',
@@ -3427,16 +3418,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_settlement_history_by_currency_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieves settlement, delivery and bankruptcy events that have affected your account.  # noqa: E501
+    def private_get_settlement_history_by_currency_get(self, currency, **kwargs):
+        """Retrieves settlement, delivery and bankruptcy events that have affected your account.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3459,10 +3450,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_settlement_history_by_currency_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_get_settlement_history_by_currency_get_with_http_info(currency, **kwargs)
 
-    def private_get_settlement_history_by_currency_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieves settlement, delivery and bankruptcy events that have affected your account.  # noqa: E501
+    def private_get_settlement_history_by_currency_get_with_http_info(self, currency, **kwargs):
+        """Retrieves settlement, delivery and bankruptcy events that have affected your account.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3489,7 +3480,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'type', 'count']  # noqa: E501
+        all_params = ['currency', 'type', 'count']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -3506,7 +3497,7 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_settlement_history_by_currency_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_settlement_history_by_currency_get`")
 
         collection_formats = {}
 
@@ -3514,11 +3505,11 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
 
         header_params = {}
 
@@ -3528,10 +3519,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_settlement_history_by_currency', 'GET',
@@ -3541,16 +3532,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_settlement_history_by_instrument_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves public settlement, delivery and bankruptcy events filtered by instrument name  # noqa: E501
+    def private_get_settlement_history_by_instrument_get(self, instrument_name, **kwargs):
+        """Retrieves public settlement, delivery and bankruptcy events filtered by instrument name
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3573,10 +3564,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_settlement_history_by_instrument_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.private_get_settlement_history_by_instrument_get_with_http_info(instrument_name, **kwargs)
 
-    def private_get_settlement_history_by_instrument_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves public settlement, delivery and bankruptcy events filtered by instrument name  # noqa: E501
+    def private_get_settlement_history_by_instrument_get_with_http_info(self, instrument_name, **kwargs):
+        """Retrieves public settlement, delivery and bankruptcy events filtered by instrument name
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3603,7 +3594,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'type', 'count']  # noqa: E501
+        all_params = ['instrument_name', 'type', 'count']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -3620,7 +3611,7 @@ class PrivateApi(object):
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_settlement_history_by_instrument_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_settlement_history_by_instrument_get`")
 
         collection_formats = {}
 
@@ -3628,11 +3619,11 @@ class PrivateApi(object):
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
 
         header_params = {}
 
@@ -3642,10 +3633,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_settlement_history_by_instrument', 'GET',
@@ -3655,16 +3646,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_subaccounts_get(self, **kwargs):  # noqa: E501
-        """Get information about subaccounts  # noqa: E501
+    def private_get_subaccounts_get(self, **kwargs):
+        """Get information about subaccounts
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3685,10 +3676,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_subaccounts_get_with_http_info(**kwargs)  # noqa: E501
+        return self.private_get_subaccounts_get_with_http_info(**kwargs)
 
-    def private_get_subaccounts_get_with_http_info(self, **kwargs):  # noqa: E501
-        """Get information about subaccounts  # noqa: E501
+    def private_get_subaccounts_get_with_http_info(self, **kwargs):
+        """Get information about subaccounts
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3713,7 +3704,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['with_portfolio']  # noqa: E501
+        all_params = ['with_portfolio']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -3734,7 +3725,7 @@ class PrivateApi(object):
 
         query_params = []
         if 'with_portfolio' in local_var_params:
-            query_params.append(('with_portfolio', local_var_params['with_portfolio']))  # noqa: E501
+            query_params.append(('with_portfolio', local_var_params['with_portfolio']))
 
         header_params = {}
 
@@ -3744,10 +3735,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_subaccounts', 'GET',
@@ -3757,16 +3748,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_transfers_get(self, currency, **kwargs):  # noqa: E501
-        """Adds new entry to address book of given type  # noqa: E501
+    def private_get_transfers_get(self, currency, **kwargs):
+        """Adds new entry to address book of given type
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3789,10 +3780,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_transfers_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_get_transfers_get_with_http_info(currency, **kwargs)
 
-    def private_get_transfers_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Adds new entry to address book of given type  # noqa: E501
+    def private_get_transfers_get_with_http_info(self, currency, **kwargs):
+        """Adds new entry to address book of given type
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3819,7 +3810,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'count', 'offset']  # noqa: E501
+        all_params = ['currency', 'count', 'offset']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -3836,7 +3827,7 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_transfers_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_transfers_get`")
 
         collection_formats = {}
 
@@ -3844,11 +3835,11 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'offset' in local_var_params:
-            query_params.append(('offset', local_var_params['offset']))  # noqa: E501
+            query_params.append(('offset', local_var_params['offset']))
 
         header_params = {}
 
@@ -3858,10 +3849,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_transfers', 'GET',
@@ -3871,16 +3862,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_user_trades_by_currency_and_time_get(self, currency, start_timestamp, end_timestamp, **kwargs):  # noqa: E501
-        """Retrieve the latest user trades that have occurred for instruments in a specific currency symbol and within given time range.  # noqa: E501
+    def private_get_user_trades_by_currency_and_time_get(self, currency, start_timestamp, end_timestamp, **kwargs):
+        """Retrieve the latest user trades that have occurred for instruments in a specific currency symbol and within given time range.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3907,10 +3898,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_user_trades_by_currency_and_time_get_with_http_info(currency, start_timestamp, end_timestamp, **kwargs)  # noqa: E501
+        return self.private_get_user_trades_by_currency_and_time_get_with_http_info(currency, start_timestamp, end_timestamp, **kwargs)
 
-    def private_get_user_trades_by_currency_and_time_get_with_http_info(self, currency, start_timestamp, end_timestamp, **kwargs):  # noqa: E501
-        """Retrieve the latest user trades that have occurred for instruments in a specific currency symbol and within given time range.  # noqa: E501
+    def private_get_user_trades_by_currency_and_time_get_with_http_info(self, currency, start_timestamp, end_timestamp, **kwargs):
+        """Retrieve the latest user trades that have occurred for instruments in a specific currency symbol and within given time range.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -3941,7 +3932,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'start_timestamp', 'end_timestamp', 'kind', 'count', 'include_old', 'sorting']  # noqa: E501
+        all_params = ['currency', 'start_timestamp', 'end_timestamp', 'kind', 'count', 'include_old', 'sorting']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -3958,15 +3949,15 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_user_trades_by_currency_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_user_trades_by_currency_and_time_get`")
         # verify the required parameter 'start_timestamp' is set
         if ('start_timestamp' not in local_var_params or
                 local_var_params['start_timestamp'] is None):
-            raise ApiValueError("Missing the required parameter `start_timestamp` when calling `private_get_user_trades_by_currency_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `start_timestamp` when calling `private_get_user_trades_by_currency_and_time_get`")
         # verify the required parameter 'end_timestamp' is set
         if ('end_timestamp' not in local_var_params or
                 local_var_params['end_timestamp'] is None):
-            raise ApiValueError("Missing the required parameter `end_timestamp` when calling `private_get_user_trades_by_currency_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `end_timestamp` when calling `private_get_user_trades_by_currency_and_time_get`")
 
         collection_formats = {}
 
@@ -3974,19 +3965,19 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'kind' in local_var_params:
-            query_params.append(('kind', local_var_params['kind']))  # noqa: E501
+            query_params.append(('kind', local_var_params['kind']))
         if 'start_timestamp' in local_var_params:
-            query_params.append(('start_timestamp', local_var_params['start_timestamp']))  # noqa: E501
+            query_params.append(('start_timestamp', local_var_params['start_timestamp']))
         if 'end_timestamp' in local_var_params:
-            query_params.append(('end_timestamp', local_var_params['end_timestamp']))  # noqa: E501
+            query_params.append(('end_timestamp', local_var_params['end_timestamp']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'include_old' in local_var_params:
-            query_params.append(('include_old', local_var_params['include_old']))  # noqa: E501
+            query_params.append(('include_old', local_var_params['include_old']))
         if 'sorting' in local_var_params:
-            query_params.append(('sorting', local_var_params['sorting']))  # noqa: E501
+            query_params.append(('sorting', local_var_params['sorting']))
 
         header_params = {}
 
@@ -3996,10 +3987,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_user_trades_by_currency_and_time', 'GET',
@@ -4009,16 +4000,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_user_trades_by_currency_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieve the latest user trades that have occurred for instruments in a specific currency symbol.  # noqa: E501
+    def private_get_user_trades_by_currency_get(self, currency, **kwargs):
+        """Retrieve the latest user trades that have occurred for instruments in a specific currency symbol.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4045,10 +4036,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_user_trades_by_currency_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_get_user_trades_by_currency_get_with_http_info(currency, **kwargs)
 
-    def private_get_user_trades_by_currency_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieve the latest user trades that have occurred for instruments in a specific currency symbol.  # noqa: E501
+    def private_get_user_trades_by_currency_get_with_http_info(self, currency, **kwargs):
+        """Retrieve the latest user trades that have occurred for instruments in a specific currency symbol.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4079,7 +4070,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'kind', 'start_id', 'end_id', 'count', 'include_old', 'sorting']  # noqa: E501
+        all_params = ['currency', 'kind', 'start_id', 'end_id', 'count', 'include_old', 'sorting']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -4096,7 +4087,7 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_user_trades_by_currency_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_user_trades_by_currency_get`")
 
         collection_formats = {}
 
@@ -4104,19 +4095,19 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'kind' in local_var_params:
-            query_params.append(('kind', local_var_params['kind']))  # noqa: E501
+            query_params.append(('kind', local_var_params['kind']))
         if 'start_id' in local_var_params:
-            query_params.append(('start_id', local_var_params['start_id']))  # noqa: E501
+            query_params.append(('start_id', local_var_params['start_id']))
         if 'end_id' in local_var_params:
-            query_params.append(('end_id', local_var_params['end_id']))  # noqa: E501
+            query_params.append(('end_id', local_var_params['end_id']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'include_old' in local_var_params:
-            query_params.append(('include_old', local_var_params['include_old']))  # noqa: E501
+            query_params.append(('include_old', local_var_params['include_old']))
         if 'sorting' in local_var_params:
-            query_params.append(('sorting', local_var_params['sorting']))  # noqa: E501
+            query_params.append(('sorting', local_var_params['sorting']))
 
         header_params = {}
 
@@ -4126,10 +4117,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_user_trades_by_currency', 'GET',
@@ -4139,16 +4130,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_user_trades_by_instrument_and_time_get(self, instrument_name, start_timestamp, end_timestamp, **kwargs):  # noqa: E501
-        """Retrieve the latest user trades that have occurred for a specific instrument and within given time range.  # noqa: E501
+    def private_get_user_trades_by_instrument_and_time_get(self, instrument_name, start_timestamp, end_timestamp, **kwargs):
+        """Retrieve the latest user trades that have occurred for a specific instrument and within given time range.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4174,10 +4165,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_user_trades_by_instrument_and_time_get_with_http_info(instrument_name, start_timestamp, end_timestamp, **kwargs)  # noqa: E501
+        return self.private_get_user_trades_by_instrument_and_time_get_with_http_info(instrument_name, start_timestamp, end_timestamp, **kwargs)
 
-    def private_get_user_trades_by_instrument_and_time_get_with_http_info(self, instrument_name, start_timestamp, end_timestamp, **kwargs):  # noqa: E501
-        """Retrieve the latest user trades that have occurred for a specific instrument and within given time range.  # noqa: E501
+    def private_get_user_trades_by_instrument_and_time_get_with_http_info(self, instrument_name, start_timestamp, end_timestamp, **kwargs):
+        """Retrieve the latest user trades that have occurred for a specific instrument and within given time range.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4207,7 +4198,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'start_timestamp', 'end_timestamp', 'count', 'include_old', 'sorting']  # noqa: E501
+        all_params = ['instrument_name', 'start_timestamp', 'end_timestamp', 'count', 'include_old', 'sorting']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -4224,15 +4215,15 @@ class PrivateApi(object):
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_user_trades_by_instrument_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_user_trades_by_instrument_and_time_get`")
         # verify the required parameter 'start_timestamp' is set
         if ('start_timestamp' not in local_var_params or
                 local_var_params['start_timestamp'] is None):
-            raise ApiValueError("Missing the required parameter `start_timestamp` when calling `private_get_user_trades_by_instrument_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `start_timestamp` when calling `private_get_user_trades_by_instrument_and_time_get`")
         # verify the required parameter 'end_timestamp' is set
         if ('end_timestamp' not in local_var_params or
                 local_var_params['end_timestamp'] is None):
-            raise ApiValueError("Missing the required parameter `end_timestamp` when calling `private_get_user_trades_by_instrument_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `end_timestamp` when calling `private_get_user_trades_by_instrument_and_time_get`")
 
         collection_formats = {}
 
@@ -4240,17 +4231,17 @@ class PrivateApi(object):
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'start_timestamp' in local_var_params:
-            query_params.append(('start_timestamp', local_var_params['start_timestamp']))  # noqa: E501
+            query_params.append(('start_timestamp', local_var_params['start_timestamp']))
         if 'end_timestamp' in local_var_params:
-            query_params.append(('end_timestamp', local_var_params['end_timestamp']))  # noqa: E501
+            query_params.append(('end_timestamp', local_var_params['end_timestamp']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'include_old' in local_var_params:
-            query_params.append(('include_old', local_var_params['include_old']))  # noqa: E501
+            query_params.append(('include_old', local_var_params['include_old']))
         if 'sorting' in local_var_params:
-            query_params.append(('sorting', local_var_params['sorting']))  # noqa: E501
+            query_params.append(('sorting', local_var_params['sorting']))
 
         header_params = {}
 
@@ -4260,10 +4251,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_user_trades_by_instrument_and_time', 'GET',
@@ -4273,16 +4264,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_user_trades_by_instrument_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieve the latest user trades that have occurred for a specific instrument.  # noqa: E501
+    def private_get_user_trades_by_instrument_get(self, instrument_name, **kwargs):
+        """Retrieve the latest user trades that have occurred for a specific instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4308,10 +4299,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_user_trades_by_instrument_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.private_get_user_trades_by_instrument_get_with_http_info(instrument_name, **kwargs)
 
-    def private_get_user_trades_by_instrument_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieve the latest user trades that have occurred for a specific instrument.  # noqa: E501
+    def private_get_user_trades_by_instrument_get_with_http_info(self, instrument_name, **kwargs):
+        """Retrieve the latest user trades that have occurred for a specific instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4341,7 +4332,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'start_seq', 'end_seq', 'count', 'include_old', 'sorting']  # noqa: E501
+        all_params = ['instrument_name', 'start_seq', 'end_seq', 'count', 'include_old', 'sorting']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -4358,7 +4349,7 @@ class PrivateApi(object):
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_user_trades_by_instrument_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_get_user_trades_by_instrument_get`")
 
         collection_formats = {}
 
@@ -4366,17 +4357,17 @@ class PrivateApi(object):
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'start_seq' in local_var_params:
-            query_params.append(('start_seq', local_var_params['start_seq']))  # noqa: E501
+            query_params.append(('start_seq', local_var_params['start_seq']))
         if 'end_seq' in local_var_params:
-            query_params.append(('end_seq', local_var_params['end_seq']))  # noqa: E501
+            query_params.append(('end_seq', local_var_params['end_seq']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'include_old' in local_var_params:
-            query_params.append(('include_old', local_var_params['include_old']))  # noqa: E501
+            query_params.append(('include_old', local_var_params['include_old']))
         if 'sorting' in local_var_params:
-            query_params.append(('sorting', local_var_params['sorting']))  # noqa: E501
+            query_params.append(('sorting', local_var_params['sorting']))
 
         header_params = {}
 
@@ -4386,10 +4377,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_user_trades_by_instrument', 'GET',
@@ -4399,16 +4390,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_user_trades_by_order_get(self, order_id, **kwargs):  # noqa: E501
-        """Retrieve the list of user trades that was created for given order  # noqa: E501
+    def private_get_user_trades_by_order_get(self, order_id, **kwargs):
+        """Retrieve the list of user trades that was created for given order
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4430,10 +4421,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_user_trades_by_order_get_with_http_info(order_id, **kwargs)  # noqa: E501
+        return self.private_get_user_trades_by_order_get_with_http_info(order_id, **kwargs)
 
-    def private_get_user_trades_by_order_get_with_http_info(self, order_id, **kwargs):  # noqa: E501
-        """Retrieve the list of user trades that was created for given order  # noqa: E501
+    def private_get_user_trades_by_order_get_with_http_info(self, order_id, **kwargs):
+        """Retrieve the list of user trades that was created for given order
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4459,7 +4450,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['order_id', 'sorting']  # noqa: E501
+        all_params = ['order_id', 'sorting']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -4476,7 +4467,7 @@ class PrivateApi(object):
         # verify the required parameter 'order_id' is set
         if ('order_id' not in local_var_params or
                 local_var_params['order_id'] is None):
-            raise ApiValueError("Missing the required parameter `order_id` when calling `private_get_user_trades_by_order_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `order_id` when calling `private_get_user_trades_by_order_get`")
 
         collection_formats = {}
 
@@ -4484,9 +4475,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'order_id' in local_var_params:
-            query_params.append(('order_id', local_var_params['order_id']))  # noqa: E501
+            query_params.append(('order_id', local_var_params['order_id']))
         if 'sorting' in local_var_params:
-            query_params.append(('sorting', local_var_params['sorting']))  # noqa: E501
+            query_params.append(('sorting', local_var_params['sorting']))
 
         header_params = {}
 
@@ -4496,10 +4487,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_user_trades_by_order', 'GET',
@@ -4509,16 +4500,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_get_withdrawals_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieve the latest users withdrawals  # noqa: E501
+    def private_get_withdrawals_get(self, currency, **kwargs):
+        """Retrieve the latest users withdrawals
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4541,10 +4532,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_get_withdrawals_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.private_get_withdrawals_get_with_http_info(currency, **kwargs)
 
-    def private_get_withdrawals_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieve the latest users withdrawals  # noqa: E501
+    def private_get_withdrawals_get_with_http_info(self, currency, **kwargs):
+        """Retrieve the latest users withdrawals
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4571,7 +4562,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'count', 'offset']  # noqa: E501
+        all_params = ['currency', 'count', 'offset']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -4588,7 +4579,7 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_withdrawals_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_withdrawals_get`")
 
         collection_formats = {}
 
@@ -4596,11 +4587,11 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'offset' in local_var_params:
-            query_params.append(('offset', local_var_params['offset']))  # noqa: E501
+            query_params.append(('offset', local_var_params['offset']))
 
         header_params = {}
 
@@ -4610,10 +4601,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/get_withdrawals', 'GET',
@@ -4623,16 +4614,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_remove_from_address_book_get(self, currency, type, address, **kwargs):  # noqa: E501
-        """Adds new entry to address book of given type  # noqa: E501
+    def private_remove_from_address_book_get(self, currency, type, address, **kwargs):
+        """Adds new entry to address book of given type
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4656,10 +4647,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_remove_from_address_book_get_with_http_info(currency, type, address, **kwargs)  # noqa: E501
+        return self.private_remove_from_address_book_get_with_http_info(currency, type, address, **kwargs)
 
-    def private_remove_from_address_book_get_with_http_info(self, currency, type, address, **kwargs):  # noqa: E501
-        """Adds new entry to address book of given type  # noqa: E501
+    def private_remove_from_address_book_get_with_http_info(self, currency, type, address, **kwargs):
+        """Adds new entry to address book of given type
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4687,7 +4678,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'type', 'address', 'tfa']  # noqa: E501
+        all_params = ['currency', 'type', 'address', 'tfa']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -4704,15 +4695,15 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_remove_from_address_book_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_remove_from_address_book_get`")
         # verify the required parameter 'type' is set
         if ('type' not in local_var_params or
                 local_var_params['type'] is None):
-            raise ApiValueError("Missing the required parameter `type` when calling `private_remove_from_address_book_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `type` when calling `private_remove_from_address_book_get`")
         # verify the required parameter 'address' is set
         if ('address' not in local_var_params or
                 local_var_params['address'] is None):
-            raise ApiValueError("Missing the required parameter `address` when calling `private_remove_from_address_book_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `address` when calling `private_remove_from_address_book_get`")
 
         collection_formats = {}
 
@@ -4720,13 +4711,13 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
         if 'address' in local_var_params:
-            query_params.append(('address', local_var_params['address']))  # noqa: E501
+            query_params.append(('address', local_var_params['address']))
         if 'tfa' in local_var_params:
-            query_params.append(('tfa', local_var_params['tfa']))  # noqa: E501
+            query_params.append(('tfa', local_var_params['tfa']))
 
         header_params = {}
 
@@ -4736,10 +4727,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/remove_from_address_book', 'GET',
@@ -4749,16 +4740,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_sell_get(self, instrument_name, amount, **kwargs):  # noqa: E501
-        """Places a sell order for an instrument.  # noqa: E501
+    def private_sell_get(self, instrument_name, amount, **kwargs):
+        """Places a sell order for an instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4790,10 +4781,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_sell_get_with_http_info(instrument_name, amount, **kwargs)  # noqa: E501
+        return self.private_sell_get_with_http_info(instrument_name, amount, **kwargs)
 
-    def private_sell_get_with_http_info(self, instrument_name, amount, **kwargs):  # noqa: E501
-        """Places a sell order for an instrument.  # noqa: E501
+    def private_sell_get_with_http_info(self, instrument_name, amount, **kwargs):
+        """Places a sell order for an instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4829,7 +4820,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'amount', 'type', 'label', 'price', 'time_in_force', 'max_show', 'post_only', 'reduce_only', 'stop_price', 'trigger', 'advanced']  # noqa: E501
+        all_params = ['instrument_name', 'amount', 'type', 'label', 'price', 'time_in_force', 'max_show', 'post_only', 'reduce_only', 'stop_price', 'trigger', 'advanced']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -4846,11 +4837,11 @@ class PrivateApi(object):
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_sell_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `private_sell_get`")
         # verify the required parameter 'amount' is set
         if ('amount' not in local_var_params or
                 local_var_params['amount'] is None):
-            raise ApiValueError("Missing the required parameter `amount` when calling `private_sell_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `amount` when calling `private_sell_get`")
 
         collection_formats = {}
 
@@ -4858,29 +4849,29 @@ class PrivateApi(object):
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'amount' in local_var_params:
-            query_params.append(('amount', local_var_params['amount']))  # noqa: E501
+            query_params.append(('amount', local_var_params['amount']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
         if 'label' in local_var_params:
-            query_params.append(('label', local_var_params['label']))  # noqa: E501
+            query_params.append(('label', local_var_params['label']))
         if 'price' in local_var_params:
-            query_params.append(('price', local_var_params['price']))  # noqa: E501
+            query_params.append(('price', local_var_params['price']))
         if 'time_in_force' in local_var_params:
-            query_params.append(('time_in_force', local_var_params['time_in_force']))  # noqa: E501
+            query_params.append(('time_in_force', local_var_params['time_in_force']))
         if 'max_show' in local_var_params:
-            query_params.append(('max_show', local_var_params['max_show']))  # noqa: E501
+            query_params.append(('max_show', local_var_params['max_show']))
         if 'post_only' in local_var_params:
-            query_params.append(('post_only', local_var_params['post_only']))  # noqa: E501
+            query_params.append(('post_only', local_var_params['post_only']))
         if 'reduce_only' in local_var_params:
-            query_params.append(('reduce_only', local_var_params['reduce_only']))  # noqa: E501
+            query_params.append(('reduce_only', local_var_params['reduce_only']))
         if 'stop_price' in local_var_params:
-            query_params.append(('stop_price', local_var_params['stop_price']))  # noqa: E501
+            query_params.append(('stop_price', local_var_params['stop_price']))
         if 'trigger' in local_var_params:
-            query_params.append(('trigger', local_var_params['trigger']))  # noqa: E501
+            query_params.append(('trigger', local_var_params['trigger']))
         if 'advanced' in local_var_params:
-            query_params.append(('advanced', local_var_params['advanced']))  # noqa: E501
+            query_params.append(('advanced', local_var_params['advanced']))
 
         header_params = {}
 
@@ -4890,10 +4881,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/sell', 'GET',
@@ -4903,16 +4894,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_set_announcement_as_read_get(self, announcement_id, **kwargs):  # noqa: E501
-        """Marks an announcement as read, so it will not be shown in `get_new_announcements`.  # noqa: E501
+    def private_set_announcement_as_read_get(self, announcement_id, **kwargs):
+        """Marks an announcement as read, so it will not be shown in `get_new_announcements`.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4933,10 +4924,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_set_announcement_as_read_get_with_http_info(announcement_id, **kwargs)  # noqa: E501
+        return self.private_set_announcement_as_read_get_with_http_info(announcement_id, **kwargs)
 
-    def private_set_announcement_as_read_get_with_http_info(self, announcement_id, **kwargs):  # noqa: E501
-        """Marks an announcement as read, so it will not be shown in `get_new_announcements`.  # noqa: E501
+    def private_set_announcement_as_read_get_with_http_info(self, announcement_id, **kwargs):
+        """Marks an announcement as read, so it will not be shown in `get_new_announcements`.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -4961,7 +4952,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['announcement_id']  # noqa: E501
+        all_params = ['announcement_id']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -4978,7 +4969,7 @@ class PrivateApi(object):
         # verify the required parameter 'announcement_id' is set
         if ('announcement_id' not in local_var_params or
                 local_var_params['announcement_id'] is None):
-            raise ApiValueError("Missing the required parameter `announcement_id` when calling `private_set_announcement_as_read_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `announcement_id` when calling `private_set_announcement_as_read_get`")
 
         collection_formats = {}
 
@@ -4986,7 +4977,7 @@ class PrivateApi(object):
 
         query_params = []
         if 'announcement_id' in local_var_params:
-            query_params.append(('announcement_id', local_var_params['announcement_id']))  # noqa: E501
+            query_params.append(('announcement_id', local_var_params['announcement_id']))
 
         header_params = {}
 
@@ -4996,10 +4987,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/set_announcement_as_read', 'GET',
@@ -5009,16 +5000,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_set_email_for_subaccount_get(self, sid, email, **kwargs):  # noqa: E501
-        """Assign an email address to a subaccount. User will receive an email with confirmation link.  # noqa: E501
+    def private_set_email_for_subaccount_get(self, sid, email, **kwargs):
+        """Assign an email address to a subaccount. User will receive an email with confirmation link.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5040,10 +5031,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_set_email_for_subaccount_get_with_http_info(sid, email, **kwargs)  # noqa: E501
+        return self.private_set_email_for_subaccount_get_with_http_info(sid, email, **kwargs)
 
-    def private_set_email_for_subaccount_get_with_http_info(self, sid, email, **kwargs):  # noqa: E501
-        """Assign an email address to a subaccount. User will receive an email with confirmation link.  # noqa: E501
+    def private_set_email_for_subaccount_get_with_http_info(self, sid, email, **kwargs):
+        """Assign an email address to a subaccount. User will receive an email with confirmation link.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5069,7 +5060,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['sid', 'email']  # noqa: E501
+        all_params = ['sid', 'email']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -5086,11 +5077,11 @@ class PrivateApi(object):
         # verify the required parameter 'sid' is set
         if ('sid' not in local_var_params or
                 local_var_params['sid'] is None):
-            raise ApiValueError("Missing the required parameter `sid` when calling `private_set_email_for_subaccount_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `sid` when calling `private_set_email_for_subaccount_get`")
         # verify the required parameter 'email' is set
         if ('email' not in local_var_params or
                 local_var_params['email'] is None):
-            raise ApiValueError("Missing the required parameter `email` when calling `private_set_email_for_subaccount_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `email` when calling `private_set_email_for_subaccount_get`")
 
         collection_formats = {}
 
@@ -5098,9 +5089,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'sid' in local_var_params:
-            query_params.append(('sid', local_var_params['sid']))  # noqa: E501
+            query_params.append(('sid', local_var_params['sid']))
         if 'email' in local_var_params:
-            query_params.append(('email', local_var_params['email']))  # noqa: E501
+            query_params.append(('email', local_var_params['email']))
 
         header_params = {}
 
@@ -5110,10 +5101,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/set_email_for_subaccount', 'GET',
@@ -5123,16 +5114,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_set_email_language_get(self, language, **kwargs):  # noqa: E501
-        """Changes the language to be used for emails.  # noqa: E501
+    def private_set_email_language_get(self, language, **kwargs):
+        """Changes the language to be used for emails.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5153,10 +5144,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_set_email_language_get_with_http_info(language, **kwargs)  # noqa: E501
+        return self.private_set_email_language_get_with_http_info(language, **kwargs)
 
-    def private_set_email_language_get_with_http_info(self, language, **kwargs):  # noqa: E501
-        """Changes the language to be used for emails.  # noqa: E501
+    def private_set_email_language_get_with_http_info(self, language, **kwargs):
+        """Changes the language to be used for emails.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5181,7 +5172,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['language']  # noqa: E501
+        all_params = ['language']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -5198,7 +5189,7 @@ class PrivateApi(object):
         # verify the required parameter 'language' is set
         if ('language' not in local_var_params or
                 local_var_params['language'] is None):
-            raise ApiValueError("Missing the required parameter `language` when calling `private_set_email_language_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `language` when calling `private_set_email_language_get`")
 
         collection_formats = {}
 
@@ -5206,7 +5197,7 @@ class PrivateApi(object):
 
         query_params = []
         if 'language' in local_var_params:
-            query_params.append(('language', local_var_params['language']))  # noqa: E501
+            query_params.append(('language', local_var_params['language']))
 
         header_params = {}
 
@@ -5216,10 +5207,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/set_email_language', 'GET',
@@ -5229,16 +5220,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_set_password_for_subaccount_get(self, sid, password, **kwargs):  # noqa: E501
-        """Set the password for the subaccount  # noqa: E501
+    def private_set_password_for_subaccount_get(self, sid, password, **kwargs):
+        """Set the password for the subaccount
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5260,10 +5251,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_set_password_for_subaccount_get_with_http_info(sid, password, **kwargs)  # noqa: E501
+        return self.private_set_password_for_subaccount_get_with_http_info(sid, password, **kwargs)
 
-    def private_set_password_for_subaccount_get_with_http_info(self, sid, password, **kwargs):  # noqa: E501
-        """Set the password for the subaccount  # noqa: E501
+    def private_set_password_for_subaccount_get_with_http_info(self, sid, password, **kwargs):
+        """Set the password for the subaccount
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5289,7 +5280,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['sid', 'password']  # noqa: E501
+        all_params = ['sid', 'password']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -5306,11 +5297,11 @@ class PrivateApi(object):
         # verify the required parameter 'sid' is set
         if ('sid' not in local_var_params or
                 local_var_params['sid'] is None):
-            raise ApiValueError("Missing the required parameter `sid` when calling `private_set_password_for_subaccount_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `sid` when calling `private_set_password_for_subaccount_get`")
         # verify the required parameter 'password' is set
         if ('password' not in local_var_params or
                 local_var_params['password'] is None):
-            raise ApiValueError("Missing the required parameter `password` when calling `private_set_password_for_subaccount_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `password` when calling `private_set_password_for_subaccount_get`")
 
         collection_formats = {}
 
@@ -5318,9 +5309,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'sid' in local_var_params:
-            query_params.append(('sid', local_var_params['sid']))  # noqa: E501
+            query_params.append(('sid', local_var_params['sid']))
         if 'password' in local_var_params:
-            query_params.append(('password', local_var_params['password']))  # noqa: E501
+            query_params.append(('password', local_var_params['password']))
 
         header_params = {}
 
@@ -5330,10 +5321,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/set_password_for_subaccount', 'GET',
@@ -5343,16 +5334,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_submit_transfer_to_subaccount_get(self, currency, amount, destination, **kwargs):  # noqa: E501
-        """Transfer funds to a subaccount.  # noqa: E501
+    def private_submit_transfer_to_subaccount_get(self, currency, amount, destination, **kwargs):
+        """Transfer funds to a subaccount.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5375,10 +5366,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_submit_transfer_to_subaccount_get_with_http_info(currency, amount, destination, **kwargs)  # noqa: E501
+        return self.private_submit_transfer_to_subaccount_get_with_http_info(currency, amount, destination, **kwargs)
 
-    def private_submit_transfer_to_subaccount_get_with_http_info(self, currency, amount, destination, **kwargs):  # noqa: E501
-        """Transfer funds to a subaccount.  # noqa: E501
+    def private_submit_transfer_to_subaccount_get_with_http_info(self, currency, amount, destination, **kwargs):
+        """Transfer funds to a subaccount.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5405,7 +5396,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'amount', 'destination']  # noqa: E501
+        all_params = ['currency', 'amount', 'destination']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -5422,15 +5413,15 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_submit_transfer_to_subaccount_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_submit_transfer_to_subaccount_get`")
         # verify the required parameter 'amount' is set
         if ('amount' not in local_var_params or
                 local_var_params['amount'] is None):
-            raise ApiValueError("Missing the required parameter `amount` when calling `private_submit_transfer_to_subaccount_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `amount` when calling `private_submit_transfer_to_subaccount_get`")
         # verify the required parameter 'destination' is set
         if ('destination' not in local_var_params or
                 local_var_params['destination'] is None):
-            raise ApiValueError("Missing the required parameter `destination` when calling `private_submit_transfer_to_subaccount_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `destination` when calling `private_submit_transfer_to_subaccount_get`")
 
         collection_formats = {}
 
@@ -5438,11 +5429,11 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'amount' in local_var_params:
-            query_params.append(('amount', local_var_params['amount']))  # noqa: E501
+            query_params.append(('amount', local_var_params['amount']))
         if 'destination' in local_var_params:
-            query_params.append(('destination', local_var_params['destination']))  # noqa: E501
+            query_params.append(('destination', local_var_params['destination']))
 
         header_params = {}
 
@@ -5452,10 +5443,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/submit_transfer_to_subaccount', 'GET',
@@ -5465,16 +5456,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_submit_transfer_to_user_get(self, currency, amount, destination, **kwargs):  # noqa: E501
-        """Transfer funds to a another user.  # noqa: E501
+    def private_submit_transfer_to_user_get(self, currency, amount, destination, **kwargs):
+        """Transfer funds to a another user.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5498,10 +5489,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_submit_transfer_to_user_get_with_http_info(currency, amount, destination, **kwargs)  # noqa: E501
+        return self.private_submit_transfer_to_user_get_with_http_info(currency, amount, destination, **kwargs)
 
-    def private_submit_transfer_to_user_get_with_http_info(self, currency, amount, destination, **kwargs):  # noqa: E501
-        """Transfer funds to a another user.  # noqa: E501
+    def private_submit_transfer_to_user_get_with_http_info(self, currency, amount, destination, **kwargs):
+        """Transfer funds to a another user.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5529,7 +5520,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'amount', 'destination', 'tfa']  # noqa: E501
+        all_params = ['currency', 'amount', 'destination', 'tfa']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -5546,15 +5537,15 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_submit_transfer_to_user_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_submit_transfer_to_user_get`")
         # verify the required parameter 'amount' is set
         if ('amount' not in local_var_params or
                 local_var_params['amount'] is None):
-            raise ApiValueError("Missing the required parameter `amount` when calling `private_submit_transfer_to_user_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `amount` when calling `private_submit_transfer_to_user_get`")
         # verify the required parameter 'destination' is set
         if ('destination' not in local_var_params or
                 local_var_params['destination'] is None):
-            raise ApiValueError("Missing the required parameter `destination` when calling `private_submit_transfer_to_user_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `destination` when calling `private_submit_transfer_to_user_get`")
 
         collection_formats = {}
 
@@ -5562,13 +5553,13 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'amount' in local_var_params:
-            query_params.append(('amount', local_var_params['amount']))  # noqa: E501
+            query_params.append(('amount', local_var_params['amount']))
         if 'destination' in local_var_params:
-            query_params.append(('destination', local_var_params['destination']))  # noqa: E501
+            query_params.append(('destination', local_var_params['destination']))
         if 'tfa' in local_var_params:
-            query_params.append(('tfa', local_var_params['tfa']))  # noqa: E501
+            query_params.append(('tfa', local_var_params['tfa']))
 
         header_params = {}
 
@@ -5578,10 +5569,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/submit_transfer_to_user', 'GET',
@@ -5591,16 +5582,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_toggle_deposit_address_creation_get(self, currency, state, **kwargs):  # noqa: E501
-        """Enable or disable deposit address creation  # noqa: E501
+    def private_toggle_deposit_address_creation_get(self, currency, state, **kwargs):
+        """Enable or disable deposit address creation
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5622,10 +5613,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_toggle_deposit_address_creation_get_with_http_info(currency, state, **kwargs)  # noqa: E501
+        return self.private_toggle_deposit_address_creation_get_with_http_info(currency, state, **kwargs)
 
-    def private_toggle_deposit_address_creation_get_with_http_info(self, currency, state, **kwargs):  # noqa: E501
-        """Enable or disable deposit address creation  # noqa: E501
+    def private_toggle_deposit_address_creation_get_with_http_info(self, currency, state, **kwargs):
+        """Enable or disable deposit address creation
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5651,7 +5642,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'state']  # noqa: E501
+        all_params = ['currency', 'state']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -5668,11 +5659,11 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_toggle_deposit_address_creation_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_toggle_deposit_address_creation_get`")
         # verify the required parameter 'state' is set
         if ('state' not in local_var_params or
                 local_var_params['state'] is None):
-            raise ApiValueError("Missing the required parameter `state` when calling `private_toggle_deposit_address_creation_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `state` when calling `private_toggle_deposit_address_creation_get`")
 
         collection_formats = {}
 
@@ -5680,9 +5671,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'state' in local_var_params:
-            query_params.append(('state', local_var_params['state']))  # noqa: E501
+            query_params.append(('state', local_var_params['state']))
 
         header_params = {}
 
@@ -5692,10 +5683,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/toggle_deposit_address_creation', 'GET',
@@ -5705,16 +5696,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_toggle_notifications_from_subaccount_get(self, sid, state, **kwargs):  # noqa: E501
-        """Enable or disable sending of notifications for the subaccount.  # noqa: E501
+    def private_toggle_notifications_from_subaccount_get(self, sid, state, **kwargs):
+        """Enable or disable sending of notifications for the subaccount.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5736,10 +5727,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_toggle_notifications_from_subaccount_get_with_http_info(sid, state, **kwargs)  # noqa: E501
+        return self.private_toggle_notifications_from_subaccount_get_with_http_info(sid, state, **kwargs)
 
-    def private_toggle_notifications_from_subaccount_get_with_http_info(self, sid, state, **kwargs):  # noqa: E501
-        """Enable or disable sending of notifications for the subaccount.  # noqa: E501
+    def private_toggle_notifications_from_subaccount_get_with_http_info(self, sid, state, **kwargs):
+        """Enable or disable sending of notifications for the subaccount.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5765,7 +5756,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['sid', 'state']  # noqa: E501
+        all_params = ['sid', 'state']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -5782,11 +5773,11 @@ class PrivateApi(object):
         # verify the required parameter 'sid' is set
         if ('sid' not in local_var_params or
                 local_var_params['sid'] is None):
-            raise ApiValueError("Missing the required parameter `sid` when calling `private_toggle_notifications_from_subaccount_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `sid` when calling `private_toggle_notifications_from_subaccount_get`")
         # verify the required parameter 'state' is set
         if ('state' not in local_var_params or
                 local_var_params['state'] is None):
-            raise ApiValueError("Missing the required parameter `state` when calling `private_toggle_notifications_from_subaccount_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `state` when calling `private_toggle_notifications_from_subaccount_get`")
 
         collection_formats = {}
 
@@ -5794,9 +5785,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'sid' in local_var_params:
-            query_params.append(('sid', local_var_params['sid']))  # noqa: E501
+            query_params.append(('sid', local_var_params['sid']))
         if 'state' in local_var_params:
-            query_params.append(('state', local_var_params['state']))  # noqa: E501
+            query_params.append(('state', local_var_params['state']))
 
         header_params = {}
 
@@ -5806,10 +5797,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/toggle_notifications_from_subaccount', 'GET',
@@ -5819,16 +5810,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_toggle_subaccount_login_get(self, sid, state, **kwargs):  # noqa: E501
-        """Enable or disable login for a subaccount. If login is disabled and a session for the subaccount exists, this session will be terminated.  # noqa: E501
+    def private_toggle_subaccount_login_get(self, sid, state, **kwargs):
+        """Enable or disable login for a subaccount. If login is disabled and a session for the subaccount exists, this session will be terminated.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5850,10 +5841,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_toggle_subaccount_login_get_with_http_info(sid, state, **kwargs)  # noqa: E501
+        return self.private_toggle_subaccount_login_get_with_http_info(sid, state, **kwargs)
 
-    def private_toggle_subaccount_login_get_with_http_info(self, sid, state, **kwargs):  # noqa: E501
-        """Enable or disable login for a subaccount. If login is disabled and a session for the subaccount exists, this session will be terminated.  # noqa: E501
+    def private_toggle_subaccount_login_get_with_http_info(self, sid, state, **kwargs):
+        """Enable or disable login for a subaccount. If login is disabled and a session for the subaccount exists, this session will be terminated.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5879,7 +5870,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['sid', 'state']  # noqa: E501
+        all_params = ['sid', 'state']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -5896,11 +5887,11 @@ class PrivateApi(object):
         # verify the required parameter 'sid' is set
         if ('sid' not in local_var_params or
                 local_var_params['sid'] is None):
-            raise ApiValueError("Missing the required parameter `sid` when calling `private_toggle_subaccount_login_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `sid` when calling `private_toggle_subaccount_login_get`")
         # verify the required parameter 'state' is set
         if ('state' not in local_var_params or
                 local_var_params['state'] is None):
-            raise ApiValueError("Missing the required parameter `state` when calling `private_toggle_subaccount_login_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `state` when calling `private_toggle_subaccount_login_get`")
 
         collection_formats = {}
 
@@ -5908,9 +5899,9 @@ class PrivateApi(object):
 
         query_params = []
         if 'sid' in local_var_params:
-            query_params.append(('sid', local_var_params['sid']))  # noqa: E501
+            query_params.append(('sid', local_var_params['sid']))
         if 'state' in local_var_params:
-            query_params.append(('state', local_var_params['state']))  # noqa: E501
+            query_params.append(('state', local_var_params['state']))
 
         header_params = {}
 
@@ -5920,10 +5911,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/toggle_subaccount_login', 'GET',
@@ -5933,16 +5924,16 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def private_withdraw_get(self, currency, address, amount, **kwargs):  # noqa: E501
-        """Creates a new withdrawal request  # noqa: E501
+    def private_withdraw_get(self, currency, address, amount, **kwargs):
+        """Creates a new withdrawal request
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5967,10 +5958,10 @@ class PrivateApi(object):
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.private_withdraw_get_with_http_info(currency, address, amount, **kwargs)  # noqa: E501
+        return self.private_withdraw_get_with_http_info(currency, address, amount, **kwargs)
 
-    def private_withdraw_get_with_http_info(self, currency, address, amount, **kwargs):  # noqa: E501
-        """Creates a new withdrawal request  # noqa: E501
+    def private_withdraw_get_with_http_info(self, currency, address, amount, **kwargs):
+        """Creates a new withdrawal request
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -5999,7 +5990,7 @@ class PrivateApi(object):
 
         local_var_params = locals()
 
-        all_params = ['currency', 'address', 'amount', 'priority', 'tfa']  # noqa: E501
+        all_params = ['currency', 'address', 'amount', 'priority', 'tfa']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -6016,15 +6007,15 @@ class PrivateApi(object):
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_withdraw_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `private_withdraw_get`")
         # verify the required parameter 'address' is set
         if ('address' not in local_var_params or
                 local_var_params['address'] is None):
-            raise ApiValueError("Missing the required parameter `address` when calling `private_withdraw_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `address` when calling `private_withdraw_get`")
         # verify the required parameter 'amount' is set
         if ('amount' not in local_var_params or
                 local_var_params['amount'] is None):
-            raise ApiValueError("Missing the required parameter `amount` when calling `private_withdraw_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `amount` when calling `private_withdraw_get`")
 
         collection_formats = {}
 
@@ -6032,15 +6023,15 @@ class PrivateApi(object):
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'address' in local_var_params:
-            query_params.append(('address', local_var_params['address']))  # noqa: E501
+            query_params.append(('address', local_var_params['address']))
         if 'amount' in local_var_params:
-            query_params.append(('amount', local_var_params['amount']))  # noqa: E501
+            query_params.append(('amount', local_var_params['amount']))
         if 'priority' in local_var_params:
-            query_params.append(('priority', local_var_params['priority']))  # noqa: E501
+            query_params.append(('priority', local_var_params['priority']))
         if 'tfa' in local_var_params:
-            query_params.append(('tfa', local_var_params['tfa']))  # noqa: E501
+            query_params.append(('tfa', local_var_params['tfa']))
 
         header_params = {}
 
@@ -6050,10 +6041,10 @@ class PrivateApi(object):
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/private/withdraw', 'GET',
@@ -6063,10 +6054,10 @@ class PrivateApi(object):
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
