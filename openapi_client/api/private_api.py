@@ -1830,9 +1830,9 @@ class PrivateApi:
             local_var_params[key] = val
         del local_var_params['kwargs']
         # verify the required parameter 'currency' is set
-        if ('currency' not in local_var_params or
-                local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `private_get_account_summary_get`")
+        if 'currency' not in local_var_params or local_var_params['currency'] is None:
+            raise ApiValueError(
+                "Missing the required parameter `currency` when calling `private_get_account_summary_get`")
 
         collection_formats = {}
 

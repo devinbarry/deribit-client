@@ -3,7 +3,7 @@
 """
     Deribit API
 
-    #Overview  Deribit provides three different interfaces to access the API:  * [JSON-RPC over Websocket](#json-rpc) * [JSON-RPC over HTTP](#json-rpc) * [FIX](#fix-api) (Financial Information eXchange)  With the API Console you can use and test the JSON-RPC API, both via HTTP and  via Websocket. To visit the API console, go to __Account > API tab >  API Console tab.__   ##Naming Deribit tradeable assets or instruments use the following system of naming:  |Kind|Examples|Template|Comments| |----|--------|--------|--------| |Future|<code>BTC-25MAR16</code>, <code>BTC-5AUG16</code>|<code>BTC-DMMMYY</code>|<code>BTC</code> is currency, <code>DMMMYY</code> is expiration date, <code>D</code> stands for day of month (1 or 2 digits), <code>MMM</code> - month (3 first letters in English), <code>YY</code> stands for year.| |Perpetual|<code>BTC-PERPETUAL</code>                        ||Perpetual contract for currency <code>BTC</code>.| |Option|<code>BTC-25MAR16-420-C</code>, <code>BTC-5AUG16-580-P</code>|<code>BTC-DMMMYY-STRIKE-K</code>|<code>STRIKE</code> is option strike price in USD. Template <code>K</code> is option kind: <code>C</code> for call options or <code>P</code> for put options.|   # JSON-RPC JSON-RPC is a light-weight remote procedure call (RPC) protocol. The  [JSON-RPC specification](https://www.jsonrpc.org/specification) defines the data structures that are used for the messages that are exchanged between client and server, as well as the rules around their processing. JSON-RPC uses JSON (RFC 4627) as data format.  JSON-RPC is transport agnostic: it does not specify which transport mechanism must be used. The Deribit API supports both Websocket (preferred) and HTTP (with limitations: subscriptions are not supported over HTTP).  ## Request messages > An example of a request message:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 8066,     \"method\": \"public/ticker\",     \"params\": {         \"instrument\": \"BTC-24AUG18-6500-P\"     } } ```  According to the JSON-RPC sepcification the requests must be JSON objects with the following fields.  |Name|Type|Description| |----|----|-----------| |jsonrpc|string|The version of the JSON-RPC spec: \"2.0\"| |id|integer or string|An identifier of the request. If it is included, then the response will contain the same identifier| |method|string|The method to be invoked| |params|object|The parameters values for the method. The field names must match with the expected parameter names. The parameters that are expected are described in the documentation for the methods, below.|  <aside class=\"warning\"> The JSON-RPC specification describes two features that are currently not supported by the API:  <ul> <li>Specification of parameter values by position</li> <li>Batch requests</li> </ul>  </aside>   ## Response messages > An example of a response message:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 5239,     \"testnet\": false,     \"result\": [         {             \"currency\": \"BTC\",             \"currencyLong\": \"Bitcoin\",             \"minConfirmation\": 2,             \"txFee\": 0.0006,             \"isActive\": true,             \"coinType\": \"BITCOIN\",             \"baseAddress\": null         }     ],     \"usIn\": 1535043730126248,     \"usOut\": 1535043730126250,     \"usDiff\": 2 } ```  The JSON-RPC API always responds with a JSON object with the following fields.   |Name|Type|Description| |----|----|-----------| |id|integer|This is the same id that was sent in the request.| |result|any|If successful, the result of the API call. The format for the result is described with each method.| |error|error object|Only present if there was an error invoking the method. The error object is described below.| |testnet|boolean|Indicates whether the API in use is actually the test API.  <code>false</code> for production server, <code>true</code> for test server.| |usIn|integer|The timestamp when the requests was received (microseconds since the Unix epoch)| |usOut|integer|The timestamp when the response was sent (microseconds since the Unix epoch)| |usDiff|integer|The number of microseconds that was spent handling the request|  <aside class=\"notice\"> The fields <code>testnet</code>, <code>usIn</code>, <code>usOut</code> and <code>usDiff</code> are not part of the JSON-RPC standard.  <p>In order not to clutter the examples they will generally be omitted from the example code.</p> </aside>  > An example of a response with an error:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 8163,     \"error\": {         \"code\": 11050,         \"message\": \"bad_request\"     },     \"testnet\": false,     \"usIn\": 1535037392434763,     \"usOut\": 1535037392448119,     \"usDiff\": 13356 } ``` In case of an error the response message will contain the error field, with as value an object with the following with the following fields:  |Name|Type|Description |----|----|-----------| |code|integer|A number that indicates the kind of error.| |message|string|A short description that indicates the kind of error.| |data|any|Additional data about the error. This field may be omitted.|  ## Notifications  > An example of a notification:  ```json {     \"jsonrpc\": \"2.0\",     \"method\": \"subscription\",     \"params\": {         \"channel\": \"deribit_price_index.btc_usd\",         \"data\": {             \"timestamp\": 1535098298227,             \"price\": 6521.17,             \"index_name\": \"btc_usd\"         }     } } ```  API users can subscribe to certain types of notifications. This means that they will receive JSON-RPC notification-messages from the server when certain events occur, such as changes to the index price or changes to the order book for a certain instrument.   The API methods [public/subscribe](#public-subscribe) and [private/subscribe](#private-subscribe) are used to set up a subscription. Since HTTP does not support the sending of messages from server to client, these methods are only availble when using the Websocket transport mechanism.  At the moment of subscription a \"channel\" must be specified. The channel determines the type of events that will be received.  See [Subscriptions](#subscriptions) for more details about the channels.  In accordance with the JSON-RPC specification, the format of a notification  is that of a request message without an <code>id</code> field. The value of the <code>method</code> field will always be <code>\"subscription\"</code>. The <code>params</code> field will always be an object with 2 members: <code>channel</code> and <code>data</code>. The value of the <code>channel</code> member is the name of the channel (a string). The value of the <code>data</code> member is an object that contains data  that is specific for the channel.   ## Authentication  > An example of a JSON request with token:  ```json {     \"id\": 5647,     \"method\": \"private/get_subaccounts\",     \"params\": {         \"access_token\": \"67SVutDoVZSzkUStHSuk51WntMNBJ5mh5DYZhwzpiqDF\"     } } ```  The API consists of `public` and `private` methods. The public methods do not require authentication. The private methods use OAuth 2.0 authentication. This means that a valid OAuth access token must be included in the request, which can get achived by calling method [public/auth](#public-auth).  When the token was assigned to the user, it should be passed along, with other request parameters, back to the server:  |Connection type|Access token placement |----|-----------| |**Websocket**|Inside request JSON parameters, as an `access_token` field| |**HTTP (REST)**|Header `Authorization: bearer ```Token``` ` value|  ### Additional authorization method - basic user credentials  <span style=\"color:red\"><b> ! Not recommended - however, it could be useful for quick testing API</b></span></br>  Every `private` method could be accessed by providing, inside HTTP `Authorization: Basic XXX` header, values with user `ClientId` and assigned `ClientSecret` (both values can be found on the API page on the Deribit website) encoded with `Base64`:  <code>Authorization: Basic BASE64(`ClientId` + `:` + `ClientSecret`)</code>   ### Additional authorization method - Deribit signature credentials  The Derbit service provides dedicated authorization method, which harness user generated signature to increase security level for passing request data. Generated value is passed inside `Authorization` header, coded as:  <code>Authorization: deri-hmac-sha256 id=```ClientId```,ts=```Timestamp```,sig=```Signature```,nonce=```Nonce```</code>  where:  |Deribit credential|Description |----|-----------| |*ClientId*|Can be found on the API page on the Deribit website| |*Timestamp*|Time when the request was generated - given as **miliseconds**. It's valid for **60 seconds** since generation, after that time any request with an old timestamp will be rejected.| |*Signature*|Value for signature calculated as described below | |*Nonce*|Single usage, user generated initialization vector for the server token|  The signature is generated by the following formula:  <code> Signature = HEX_STRING( HMAC-SHA256( ClientSecret, StringToSign ) );</code></br>  <code> StringToSign =  Timestamp + \"\\n\" + Nonce + \"\\n\" + RequestData;</code></br>  <code> RequestData =  UPPERCASE(HTTP_METHOD())  + \"\\n\" + URI() + \"\\n\" + RequestBody + \"\\n\";</code></br>   e.g. (using shell with ```openssl``` tool):  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientId=AAAAAAAAAAA</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientSecret=ABCD</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Timestamp=$( date +%s000 )</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Nonce=$( cat /dev/urandom | tr -dc 'a-z0-9' | head -c8 )</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;URI=\"/api/v2/private/get_account_summary?currency=BTC\"</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;HttpMethod=GET</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Body=\"\"</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Signature=$( echo -ne \"${Timestamp}\\n${Nonce}\\n${HttpMethod}\\n${URI}\\n${Body}\\n\" | openssl sha256 -r -hmac \"$ClientSecret\" | cut -f1 -d' ' )</code></br></br> <code>&nbsp;&nbsp;&nbsp;&nbsp;echo $Signature</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;shell output> ea40d5e5e4fae235ab22b61da98121fbf4acdc06db03d632e23c66bcccb90d2c  (**WARNING**: Exact value depends on current timestamp and client credentials</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;curl -s -X ${HttpMethod} -H \"Authorization: deri-hmac-sha256 id=${ClientId},ts=${Timestamp},nonce=${Nonce},sig=${Signature}\" \"https://www.deribit.com${URI}\"</code></br></br>    ### Additional authorization method - signature credentials (WebSocket API)  When connecting through Websocket, user can request for authorization using ```client_credential``` method, which requires providing following parameters (as a part of JSON request):  |JSON parameter|Description |----|-----------| |*grant_type*|Must be **client_signature**| |*client_id*|Can be found on the API page on the Deribit website| |*timestamp*|Time when the request was generated - given as **miliseconds**. It's valid for **60 seconds** since generation, after that time any request with an old timestamp will be rejected.| |*signature*|Value for signature calculated as described below | |*nonce*|Single usage, user generated initialization vector for the server token| |*data*|**Optional** field, which contains any user specific value|  The signature is generated by the following formula:  <code> StringToSign =  Timestamp + \"\\n\" + Nonce + \"\\n\" + Data;</code></br>  <code> Signature = HEX_STRING( HMAC-SHA256( ClientSecret, StringToSign ) );</code></br>   e.g. (using shell with ```openssl``` tool):  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientId=AAAAAAAAAAA</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientSecret=ABCD</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Timestamp=$( date +%s000 ) # e.g. 1554883365000 </code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Nonce=$( cat /dev/urandom | tr -dc 'a-z0-9' | head -c8 ) # e.g. fdbmmz79 </code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Data=\"\"</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Signature=$( echo -ne \"${Timestamp}\\n${Nonce}\\n${Data}\\n\" | openssl sha256 -r -hmac \"$ClientSecret\" | cut -f1 -d' ' )</code></br></br> <code>&nbsp;&nbsp;&nbsp;&nbsp;echo $Signature</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;shell output> e20c9cd5639d41f8bbc88f4d699c4baf94a4f0ee320e9a116b72743c449eb994  (**WARNING**: Exact value depends on current timestamp and client credentials</code></br></br>   You can also check the signature value using some online tools like, e.g: [https://codebeautify.org/hmac-generator](https://codebeautify.org/hmac-generator) (but don't forget about adding *newline* after each part of the hashed text and remember that you **should use** it only with your **test credentials**).   Here's a sample JSON request created using the values from the example above:  <code> {                            </br> &nbsp;&nbsp;\"jsonrpc\" : \"2.0\",         </br> &nbsp;&nbsp;\"id\" : 9929,               </br> &nbsp;&nbsp;\"method\" : \"public/auth\",  </br> &nbsp;&nbsp;\"params\" :                 </br> &nbsp;&nbsp;{                        </br> &nbsp;&nbsp;&nbsp;&nbsp;\"grant_type\" : \"client_signature\",   </br> &nbsp;&nbsp;&nbsp;&nbsp;\"client_id\" : \"AAAAAAAAAAA\",         </br> &nbsp;&nbsp;&nbsp;&nbsp;\"timestamp\": \"1554883365000\",        </br> &nbsp;&nbsp;&nbsp;&nbsp;\"nonce\": \"fdbmmz79\",                 </br> &nbsp;&nbsp;&nbsp;&nbsp;\"data\": \"\",                          </br> &nbsp;&nbsp;&nbsp;&nbsp;\"signature\" : \"e20c9cd5639d41f8bbc88f4d699c4baf94a4f0ee320e9a116b72743c449eb994\"  </br> &nbsp;&nbsp;}                        </br> }                            </br> </code>   ### Access scope  When asking for `access token` user can provide the required access level (called `scope`) which defines what type of functionality he/she wants to use, and whether requests are only going to check for some data or also to update them.  Scopes are required and checked for `private` methods, so if you plan to use only `public` information you can stay with values assigned by default.  |Scope|Description |----|-----------| |*account:read*|Access to **account** methods - read only data| |*account:read_write*|Access to **account** methods - allows to manage account settings, add subaccounts, etc.| |*trade:read*|Access to **trade** methods - read only data| |*trade:read_write*|Access to **trade** methods - required to create and modify orders| |*wallet:read*|Access to **wallet** methods - read only data| |*wallet:read_write*|Access to **wallet** methods - allows to withdraw, generate new deposit address, etc.| |*wallet:none*, *account:none*, *trade:none*|Blocked access to specified functionality|    <span style=\"color:red\">**NOTICE:**</span> Depending on choosing an authentication method (```grant type```) some scopes could be narrowed by the server. e.g. when ```grant_type = client_credentials``` and ```scope = wallet:read_write``` it's modified by the server as ```scope = wallet:read```\"   ## JSON-RPC over websocket Websocket is the prefered transport mechanism for the JSON-RPC API, because it is faster and because it can support [subscriptions](#subscriptions) and [cancel on disconnect](#private-enable_cancel_on_disconnect). The code examples that can be found next to each of the methods show how websockets can be used from Python or Javascript/node.js.  ## JSON-RPC over HTTP Besides websockets it is also possible to use the API via HTTP. The code examples for 'shell' show how this can be done using curl. Note that subscriptions and cancel on disconnect are not supported via HTTP.  #Methods   # noqa: E501
+    #Overview  Deribit provides three different interfaces to access the API:  * [JSON-RPC over Websocket](#json-rpc) * [JSON-RPC over HTTP](#json-rpc) * [FIX](#fix-api) (Financial Information eXchange)  With the API Console you can use and test the JSON-RPC API, both via HTTP and  via Websocket. To visit the API console, go to __Account > API tab >  API Console tab.__   ##Naming Deribit tradeable assets or instruments use the following system of naming:  |Kind|Examples|Template|Comments| |----|--------|--------|--------| |Future|<code>BTC-25MAR16</code>, <code>BTC-5AUG16</code>|<code>BTC-DMMMYY</code>|<code>BTC</code> is currency, <code>DMMMYY</code> is expiration date, <code>D</code> stands for day of month (1 or 2 digits), <code>MMM</code> - month (3 first letters in English), <code>YY</code> stands for year.| |Perpetual|<code>BTC-PERPETUAL</code>                        ||Perpetual contract for currency <code>BTC</code>.| |Option|<code>BTC-25MAR16-420-C</code>, <code>BTC-5AUG16-580-P</code>|<code>BTC-DMMMYY-STRIKE-K</code>|<code>STRIKE</code> is option strike price in USD. Template <code>K</code> is option kind: <code>C</code> for call options or <code>P</code> for put options.|   # JSON-RPC JSON-RPC is a light-weight remote procedure call (RPC) protocol. The  [JSON-RPC specification](https://www.jsonrpc.org/specification) defines the data structures that are used for the messages that are exchanged between client and server, as well as the rules around their processing. JSON-RPC uses JSON (RFC 4627) as data format.  JSON-RPC is transport agnostic: it does not specify which transport mechanism must be used. The Deribit API supports both Websocket (preferred) and HTTP (with limitations: subscriptions are not supported over HTTP).  ## Request messages > An example of a request message:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 8066,     \"method\": \"public/ticker\",     \"params\": {         \"instrument\": \"BTC-24AUG18-6500-P\"     } } ```  According to the JSON-RPC sepcification the requests must be JSON objects with the following fields.  |Name|Type|Description| |----|----|-----------| |jsonrpc|string|The version of the JSON-RPC spec: \"2.0\"| |id|integer or string|An identifier of the request. If it is included, then the response will contain the same identifier| |method|string|The method to be invoked| |params|object|The parameters values for the method. The field names must match with the expected parameter names. The parameters that are expected are described in the documentation for the methods, below.|  <aside class=\"warning\"> The JSON-RPC specification describes two features that are currently not supported by the API:  <ul> <li>Specification of parameter values by position</li> <li>Batch requests</li> </ul>  </aside>   ## Response messages > An example of a response message:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 5239,     \"testnet\": false,     \"result\": [         {             \"currency\": \"BTC\",             \"currencyLong\": \"Bitcoin\",             \"minConfirmation\": 2,             \"txFee\": 0.0006,             \"isActive\": true,             \"coinType\": \"BITCOIN\",             \"baseAddress\": null         }     ],     \"usIn\": 1535043730126248,     \"usOut\": 1535043730126250,     \"usDiff\": 2 } ```  The JSON-RPC API always responds with a JSON object with the following fields.   |Name|Type|Description| |----|----|-----------| |id|integer|This is the same id that was sent in the request.| |result|any|If successful, the result of the API call. The format for the result is described with each method.| |error|error object|Only present if there was an error invoking the method. The error object is described below.| |testnet|boolean|Indicates whether the API in use is actually the test API.  <code>false</code> for production server, <code>true</code> for test server.| |usIn|integer|The timestamp when the requests was received (microseconds since the Unix epoch)| |usOut|integer|The timestamp when the response was sent (microseconds since the Unix epoch)| |usDiff|integer|The number of microseconds that was spent handling the request|  <aside class=\"notice\"> The fields <code>testnet</code>, <code>usIn</code>, <code>usOut</code> and <code>usDiff</code> are not part of the JSON-RPC standard.  <p>In order not to clutter the examples they will generally be omitted from the example code.</p> </aside>  > An example of a response with an error:  ```json {     \"jsonrpc\": \"2.0\",     \"id\": 8163,     \"error\": {         \"code\": 11050,         \"message\": \"bad_request\"     },     \"testnet\": false,     \"usIn\": 1535037392434763,     \"usOut\": 1535037392448119,     \"usDiff\": 13356 } ``` In case of an error the response message will contain the error field, with as value an object with the following with the following fields:  |Name|Type|Description |----|----|-----------| |code|integer|A number that indicates the kind of error.| |message|string|A short description that indicates the kind of error.| |data|any|Additional data about the error. This field may be omitted.|  ## Notifications  > An example of a notification:  ```json {     \"jsonrpc\": \"2.0\",     \"method\": \"subscription\",     \"params\": {         \"channel\": \"deribit_price_index.btc_usd\",         \"data\": {             \"timestamp\": 1535098298227,             \"price\": 6521.17,             \"index_name\": \"btc_usd\"         }     } } ```  API users can subscribe to certain types of notifications. This means that they will receive JSON-RPC notification-messages from the server when certain events occur, such as changes to the index price or changes to the order book for a certain instrument.   The API methods [public/subscribe](#public-subscribe) and [private/subscribe](#private-subscribe) are used to set up a subscription. Since HTTP does not support the sending of messages from server to client, these methods are only availble when using the Websocket transport mechanism.  At the moment of subscription a \"channel\" must be specified. The channel determines the type of events that will be received.  See [Subscriptions](#subscriptions) for more details about the channels.  In accordance with the JSON-RPC specification, the format of a notification  is that of a request message without an <code>id</code> field. The value of the <code>method</code> field will always be <code>\"subscription\"</code>. The <code>params</code> field will always be an object with 2 members: <code>channel</code> and <code>data</code>. The value of the <code>channel</code> member is the name of the channel (a string). The value of the <code>data</code> member is an object that contains data  that is specific for the channel.   ## Authentication  > An example of a JSON request with token:  ```json {     \"id\": 5647,     \"method\": \"private/get_subaccounts\",     \"params\": {         \"access_token\": \"67SVutDoVZSzkUStHSuk51WntMNBJ5mh5DYZhwzpiqDF\"     } } ```  The API consists of `public` and `private` methods. The public methods do not require authentication. The private methods use OAuth 2.0 authentication. This means that a valid OAuth access token must be included in the request, which can get achived by calling method [public/auth](#public-auth).  When the token was assigned to the user, it should be passed along, with other request parameters, back to the server:  |Connection type|Access token placement |----|-----------| |**Websocket**|Inside request JSON parameters, as an `access_token` field| |**HTTP (REST)**|Header `Authorization: bearer ```Token``` ` value|  ### Additional authorization method - basic user credentials  <span style=\"color:red\"><b> ! Not recommended - however, it could be useful for quick testing API</b></span></br>  Every `private` method could be accessed by providing, inside HTTP `Authorization: Basic XXX` header, values with user `ClientId` and assigned `ClientSecret` (both values can be found on the API page on the Deribit website) encoded with `Base64`:  <code>Authorization: Basic BASE64(`ClientId` + `:` + `ClientSecret`)</code>   ### Additional authorization method - Deribit signature credentials  The Derbit service provides dedicated authorization method, which harness user generated signature to increase security level for passing request data. Generated value is passed inside `Authorization` header, coded as:  <code>Authorization: deri-hmac-sha256 id=```ClientId```,ts=```Timestamp```,sig=```Signature```,nonce=```Nonce```</code>  where:  |Deribit credential|Description |----|-----------| |*ClientId*|Can be found on the API page on the Deribit website| |*Timestamp*|Time when the request was generated - given as **miliseconds**. It's valid for **60 seconds** since generation, after that time any request with an old timestamp will be rejected.| |*Signature*|Value for signature calculated as described below | |*Nonce*|Single usage, user generated initialization vector for the server token|  The signature is generated by the following formula:  <code> Signature = HEX_STRING( HMAC-SHA256( ClientSecret, StringToSign ) );</code></br>  <code> StringToSign =  Timestamp + \"\\n\" + Nonce + \"\\n\" + RequestData;</code></br>  <code> RequestData =  UPPERCASE(HTTP_METHOD())  + \"\\n\" + URI() + \"\\n\" + RequestBody + \"\\n\";</code></br>   e.g. (using shell with ```openssl``` tool):  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientId=AAAAAAAAAAA</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientSecret=ABCD</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Timestamp=$( date +%s000 )</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Nonce=$( cat /dev/urandom | tr -dc 'a-z0-9' | head -c8 )</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;URI=\"/api/v2/private/get_account_summary?currency=BTC\"</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;HttpMethod=GET</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Body=\"\"</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Signature=$( echo -ne \"${Timestamp}\\n${Nonce}\\n${HttpMethod}\\n${URI}\\n${Body}\\n\" | openssl sha256 -r -hmac \"$ClientSecret\" | cut -f1 -d' ' )</code></br></br> <code>&nbsp;&nbsp;&nbsp;&nbsp;echo $Signature</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;shell output> ea40d5e5e4fae235ab22b61da98121fbf4acdc06db03d632e23c66bcccb90d2c  (**WARNING**: Exact value depends on current timestamp and client credentials</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;curl -s -X ${HttpMethod} -H \"Authorization: deri-hmac-sha256 id=${ClientId},ts=${Timestamp},nonce=${Nonce},sig=${Signature}\" \"https://www.deribit.com${URI}\"</code></br></br>    ### Additional authorization method - signature credentials (WebSocket API)  When connecting through Websocket, user can request for authorization using ```client_credential``` method, which requires providing following parameters (as a part of JSON request):  |JSON parameter|Description |----|-----------| |*grant_type*|Must be **client_signature**| |*client_id*|Can be found on the API page on the Deribit website| |*timestamp*|Time when the request was generated - given as **miliseconds**. It's valid for **60 seconds** since generation, after that time any request with an old timestamp will be rejected.| |*signature*|Value for signature calculated as described below | |*nonce*|Single usage, user generated initialization vector for the server token| |*data*|**Optional** field, which contains any user specific value|  The signature is generated by the following formula:  <code> StringToSign =  Timestamp + \"\\n\" + Nonce + \"\\n\" + Data;</code></br>  <code> Signature = HEX_STRING( HMAC-SHA256( ClientSecret, StringToSign ) );</code></br>   e.g. (using shell with ```openssl``` tool):  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientId=AAAAAAAAAAA</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;ClientSecret=ABCD</code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Timestamp=$( date +%s000 ) # e.g. 1554883365000 </code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Nonce=$( cat /dev/urandom | tr -dc 'a-z0-9' | head -c8 ) # e.g. fdbmmz79 </code></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Data=\"\"</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;Signature=$( echo -ne \"${Timestamp}\\n${Nonce}\\n${Data}\\n\" | openssl sha256 -r -hmac \"$ClientSecret\" | cut -f1 -d' ' )</code></br></br> <code>&nbsp;&nbsp;&nbsp;&nbsp;echo $Signature</code></br></br>  <code>&nbsp;&nbsp;&nbsp;&nbsp;shell output> e20c9cd5639d41f8bbc88f4d699c4baf94a4f0ee320e9a116b72743c449eb994  (**WARNING**: Exact value depends on current timestamp and client credentials</code></br></br>   You can also check the signature value using some online tools like, e.g: [https://codebeautify.org/hmac-generator](https://codebeautify.org/hmac-generator) (but don't forget about adding *newline* after each part of the hashed text and remember that you **should use** it only with your **test credentials**).   Here's a sample JSON request created using the values from the example above:  <code> {                            </br> &nbsp;&nbsp;\"jsonrpc\" : \"2.0\",         </br> &nbsp;&nbsp;\"id\" : 9929,               </br> &nbsp;&nbsp;\"method\" : \"public/auth\",  </br> &nbsp;&nbsp;\"params\" :                 </br> &nbsp;&nbsp;{                        </br> &nbsp;&nbsp;&nbsp;&nbsp;\"grant_type\" : \"client_signature\",   </br> &nbsp;&nbsp;&nbsp;&nbsp;\"client_id\" : \"AAAAAAAAAAA\",         </br> &nbsp;&nbsp;&nbsp;&nbsp;\"timestamp\": \"1554883365000\",        </br> &nbsp;&nbsp;&nbsp;&nbsp;\"nonce\": \"fdbmmz79\",                 </br> &nbsp;&nbsp;&nbsp;&nbsp;\"data\": \"\",                          </br> &nbsp;&nbsp;&nbsp;&nbsp;\"signature\" : \"e20c9cd5639d41f8bbc88f4d699c4baf94a4f0ee320e9a116b72743c449eb994\"  </br> &nbsp;&nbsp;}                        </br> }                            </br> </code>   ### Access scope  When asking for `access token` user can provide the required access level (called `scope`) which defines what type of functionality he/she wants to use, and whether requests are only going to check for some data or also to update them.  Scopes are required and checked for `private` methods, so if you plan to use only `public` information you can stay with values assigned by default.  |Scope|Description |----|-----------| |*account:read*|Access to **account** methods - read only data| |*account:read_write*|Access to **account** methods - allows to manage account settings, add subaccounts, etc.| |*trade:read*|Access to **trade** methods - read only data| |*trade:read_write*|Access to **trade** methods - required to create and modify orders| |*wallet:read*|Access to **wallet** methods - read only data| |*wallet:read_write*|Access to **wallet** methods - allows to withdraw, generate new deposit address, etc.| |*wallet:none*, *account:none*, *trade:none*|Blocked access to specified functionality|    <span style=\"color:red\">**NOTICE:**</span> Depending on choosing an authentication method (```grant type```) some scopes could be narrowed by the server. e.g. when ```grant_type = client_credentials``` and ```scope = wallet:read_write``` it's modified by the server as ```scope = wallet:read```\"   ## JSON-RPC over websocket Websocket is the prefered transport mechanism for the JSON-RPC API, because it is faster and because it can support [subscriptions](#subscriptions) and [cancel on disconnect](#private-enable_cancel_on_disconnect). The code examples that can be found next to each of the methods show how websockets can be used from Python or Javascript/node.js.  ## JSON-RPC over HTTP Besides websockets it is also possible to use the API via HTTP. The code examples for 'shell' show how this can be done using curl. Note that subscriptions and cancel on disconnect are not supported via HTTP.  #Methods
 
     The version of the OpenAPI document: 2.0.0
     Generated by: https://openapi-generator.tech
@@ -27,7 +27,7 @@ class PublicApi:
                         signature, **kwargs):
         """Authenticate
 
-        Retrieve an Oauth access token, to be used for authentication of 'private' requests.  Three methods of authentication are supported:  - <code>password</code> - using email and and password as when logging on to the website - <code>client_credentials</code> - using the access key and access secret that can be found on the API page on the website - <code>client_signature</code> - using the access key that can be found on the API page on the website and user generated signature. The signature is calculated using some fields provided in the request, using formula described here [Deribit signature credentials](#additional-authorization-method-deribit-signature-credentials) - <code>refresh_token</code> - using a refresh token that was received from an earlier invocation  The response will contain an access token, expiration period (number of seconds that the token is valid) and a refresh token that can be used to get a new set of tokens.   # noqa: E501
+        Retrieve an Oauth access token, to be used for authentication of 'private' requests.  Three methods of authentication are supported:  - <code>password</code> - using email and and password as when logging on to the website - <code>client_credentials</code> - using the access key and access secret that can be found on the API page on the website - <code>client_signature</code> - using the access key that can be found on the API page on the website and user generated signature. The signature is calculated using some fields provided in the request, using formula described here [Deribit signature credentials](#additional-authorization-method-deribit-signature-credentials) - <code>refresh_token</code> - using a refresh token that was received from an earlier invocation  The response will contain an access token, expiration period (number of seconds that the token is valid) and a refresh token that can be used to get a new set of tokens.
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
         >>> thread = api.public_auth_get(grant_type, username, password, client_id, client_secret, refresh_token, timestamp, signature, async_req=True)
@@ -57,12 +57,12 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_auth_get_with_http_info(grant_type, username, password, client_id, client_secret, refresh_token, timestamp, signature, **kwargs)  # noqa: E501
+        return self.public_auth_get_with_http_info(grant_type, username, password, client_id, client_secret, refresh_token, timestamp, signature, **kwargs)
 
-    def public_auth_get_with_http_info(self, grant_type, username, password, client_id, client_secret, refresh_token, timestamp, signature, **kwargs):  # noqa: E501
-        """Authenticate  # noqa: E501
+    def public_auth_get_with_http_info(self, grant_type, username, password, client_id, client_secret, refresh_token, timestamp, signature, **kwargs):
+        """Authenticate
 
-        Retrieve an Oauth access token, to be used for authentication of 'private' requests.  Three methods of authentication are supported:  - <code>password</code> - using email and and password as when logging on to the website - <code>client_credentials</code> - using the access key and access secret that can be found on the API page on the website - <code>client_signature</code> - using the access key that can be found on the API page on the website and user generated signature. The signature is calculated using some fields provided in the request, using formula described here [Deribit signature credentials](#additional-authorization-method-deribit-signature-credentials) - <code>refresh_token</code> - using a refresh token that was received from an earlier invocation  The response will contain an access token, expiration period (number of seconds that the token is valid) and a refresh token that can be used to get a new set of tokens.   # noqa: E501
+        Retrieve an Oauth access token, to be used for authentication of 'private' requests.  Three methods of authentication are supported:  - <code>password</code> - using email and and password as when logging on to the website - <code>client_credentials</code> - using the access key and access secret that can be found on the API page on the website - <code>client_signature</code> - using the access key that can be found on the API page on the website and user generated signature. The signature is calculated using some fields provided in the request, using formula described here [Deribit signature credentials](#additional-authorization-method-deribit-signature-credentials) - <code>refresh_token</code> - using a refresh token that was received from an earlier invocation  The response will contain an access token, expiration period (number of seconds that the token is valid) and a refresh token that can be used to get a new set of tokens.
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
         >>> thread = api.public_auth_get_with_http_info(grant_type, username, password, client_id, client_secret, refresh_token, timestamp, signature, async_req=True)
@@ -96,7 +96,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['grant_type', 'username', 'password', 'client_id', 'client_secret', 'refresh_token', 'timestamp', 'signature', 'nonce', 'state', 'scope']  # noqa: E501
+        all_params = ['grant_type', 'username', 'password', 'client_id', 'client_secret', 'refresh_token', 'timestamp', 'signature', 'nonce', 'state', 'scope']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -113,35 +113,35 @@ class PublicApi:
         # verify the required parameter 'grant_type' is set
         if ('grant_type' not in local_var_params or
                 local_var_params['grant_type'] is None):
-            raise ApiValueError("Missing the required parameter `grant_type` when calling `public_auth_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `grant_type` when calling `public_auth_get`")
         # verify the required parameter 'username' is set
         if ('username' not in local_var_params or
                 local_var_params['username'] is None):
-            raise ApiValueError("Missing the required parameter `username` when calling `public_auth_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `username` when calling `public_auth_get`")
         # verify the required parameter 'password' is set
         if ('password' not in local_var_params or
                 local_var_params['password'] is None):
-            raise ApiValueError("Missing the required parameter `password` when calling `public_auth_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `password` when calling `public_auth_get`")
         # verify the required parameter 'client_id' is set
         if ('client_id' not in local_var_params or
                 local_var_params['client_id'] is None):
-            raise ApiValueError("Missing the required parameter `client_id` when calling `public_auth_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `client_id` when calling `public_auth_get`")
         # verify the required parameter 'client_secret' is set
         if ('client_secret' not in local_var_params or
                 local_var_params['client_secret'] is None):
-            raise ApiValueError("Missing the required parameter `client_secret` when calling `public_auth_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `client_secret` when calling `public_auth_get`")
         # verify the required parameter 'refresh_token' is set
         if ('refresh_token' not in local_var_params or
                 local_var_params['refresh_token'] is None):
-            raise ApiValueError("Missing the required parameter `refresh_token` when calling `public_auth_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `refresh_token` when calling `public_auth_get`")
         # verify the required parameter 'timestamp' is set
         if ('timestamp' not in local_var_params or
                 local_var_params['timestamp'] is None):
-            raise ApiValueError("Missing the required parameter `timestamp` when calling `public_auth_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `timestamp` when calling `public_auth_get`")
         # verify the required parameter 'signature' is set
         if ('signature' not in local_var_params or
                 local_var_params['signature'] is None):
-            raise ApiValueError("Missing the required parameter `signature` when calling `public_auth_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `signature` when calling `public_auth_get`")
 
         collection_formats = {}
 
@@ -149,27 +149,27 @@ class PublicApi:
 
         query_params = []
         if 'grant_type' in local_var_params:
-            query_params.append(('grant_type', local_var_params['grant_type']))  # noqa: E501
+            query_params.append(('grant_type', local_var_params['grant_type']))
         if 'username' in local_var_params:
-            query_params.append(('username', local_var_params['username']))  # noqa: E501
+            query_params.append(('username', local_var_params['username']))
         if 'password' in local_var_params:
-            query_params.append(('password', local_var_params['password']))  # noqa: E501
+            query_params.append(('password', local_var_params['password']))
         if 'client_id' in local_var_params:
-            query_params.append(('client_id', local_var_params['client_id']))  # noqa: E501
+            query_params.append(('client_id', local_var_params['client_id']))
         if 'client_secret' in local_var_params:
-            query_params.append(('client_secret', local_var_params['client_secret']))  # noqa: E501
+            query_params.append(('client_secret', local_var_params['client_secret']))
         if 'refresh_token' in local_var_params:
-            query_params.append(('refresh_token', local_var_params['refresh_token']))  # noqa: E501
+            query_params.append(('refresh_token', local_var_params['refresh_token']))
         if 'timestamp' in local_var_params:
-            query_params.append(('timestamp', local_var_params['timestamp']))  # noqa: E501
+            query_params.append(('timestamp', local_var_params['timestamp']))
         if 'signature' in local_var_params:
-            query_params.append(('signature', local_var_params['signature']))  # noqa: E501
+            query_params.append(('signature', local_var_params['signature']))
         if 'nonce' in local_var_params:
-            query_params.append(('nonce', local_var_params['nonce']))  # noqa: E501
+            query_params.append(('nonce', local_var_params['nonce']))
         if 'state' in local_var_params:
-            query_params.append(('state', local_var_params['state']))  # noqa: E501
+            query_params.append(('state', local_var_params['state']))
         if 'scope' in local_var_params:
-            query_params.append(('scope', local_var_params['scope']))  # noqa: E501
+            query_params.append(('scope', local_var_params['scope']))
 
         header_params = {}
 
@@ -178,11 +178,10 @@ class PublicApi:
 
         body_params = None
         # HTTP header `Accept`
-        header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+        header_params['Accept'] = self.api_client.select_header_accept(['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/auth', 'GET',
@@ -192,16 +191,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_announcements_get(self, **kwargs):  # noqa: E501
-        """Retrieves announcements from the last 30 days.  # noqa: E501
+    def public_get_announcements_get(self, **kwargs):
+        """Retrieves announcements from the last 30 days.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -221,10 +220,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_announcements_get_with_http_info(**kwargs)  # noqa: E501
+        return self.public_get_announcements_get_with_http_info(**kwargs)
 
-    def public_get_announcements_get_with_http_info(self, **kwargs):  # noqa: E501
-        """Retrieves announcements from the last 30 days.  # noqa: E501
+    def public_get_announcements_get_with_http_info(self, **kwargs):
+        """Retrieves announcements from the last 30 days.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -248,7 +247,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = []  # noqa: E501
+        all_params = []
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -276,11 +275,10 @@ class PublicApi:
 
         body_params = None
         # HTTP header `Accept`
-        header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+        header_params['Accept'] = self.api_client.select_header_accept(['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_announcements', 'GET',
@@ -290,16 +288,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_book_summary_by_currency_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieves the summary information such as open interest, 24h volume, etc. for all instruments for the currency (optionally filtered by kind).  # noqa: E501
+    def public_get_book_summary_by_currency_get(self, currency, **kwargs):
+        """Retrieves the summary information such as open interest, 24h volume, etc. for all instruments for the currency (optionally filtered by kind).
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -321,10 +319,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_book_summary_by_currency_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.public_get_book_summary_by_currency_get_with_http_info(currency, **kwargs)
 
-    def public_get_book_summary_by_currency_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieves the summary information such as open interest, 24h volume, etc. for all instruments for the currency (optionally filtered by kind).  # noqa: E501
+    def public_get_book_summary_by_currency_get_with_http_info(self, currency, **kwargs):
+        """Retrieves the summary information such as open interest, 24h volume, etc. for all instruments for the currency (optionally filtered by kind).
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -350,7 +348,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['currency', 'kind']  # noqa: E501
+        all_params = ['currency', 'kind']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -365,9 +363,9 @@ class PublicApi:
             local_var_params[key] = val
         del local_var_params['kwargs']
         # verify the required parameter 'currency' is set
-        if ('currency' not in local_var_params or
-                local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_book_summary_by_currency_get`")  # noqa: E501
+        if 'currency' not in local_var_params or local_var_params['currency'] is None:
+            raise ApiValueError(
+                "Missing the required parameter `currency` when calling `public_get_book_summary_by_currency_get`")
 
         collection_formats = {}
 
@@ -375,9 +373,9 @@ class PublicApi:
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'kind' in local_var_params:
-            query_params.append(('kind', local_var_params['kind']))  # noqa: E501
+            query_params.append(('kind', local_var_params['kind']))
 
         header_params = {}
 
@@ -386,11 +384,10 @@ class PublicApi:
 
         body_params = None
         # HTTP header `Accept`
-        header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+        header_params['Accept'] = self.api_client.select_header_accept(['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_book_summary_by_currency', 'GET',
@@ -400,16 +397,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_book_summary_by_instrument_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves the summary information such as open interest, 24h volume, etc. for a specific instrument.  # noqa: E501
+    def public_get_book_summary_by_instrument_get(self, instrument_name, **kwargs):
+        """Retrieves the summary information such as open interest, 24h volume, etc. for a specific instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -430,10 +427,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_book_summary_by_instrument_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.public_get_book_summary_by_instrument_get_with_http_info(instrument_name, **kwargs)
 
-    def public_get_book_summary_by_instrument_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves the summary information such as open interest, 24h volume, etc. for a specific instrument.  # noqa: E501
+    def public_get_book_summary_by_instrument_get_with_http_info(self, instrument_name, **kwargs):
+        """Retrieves the summary information such as open interest, 24h volume, etc. for a specific instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -458,7 +455,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['instrument_name']  # noqa: E501
+        all_params = ['instrument_name']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -475,7 +472,7 @@ class PublicApi:
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_book_summary_by_instrument_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_book_summary_by_instrument_get`")
 
         collection_formats = {}
 
@@ -483,7 +480,7 @@ class PublicApi:
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
 
         header_params = {}
 
@@ -493,10 +490,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_book_summary_by_instrument', 'GET',
@@ -506,16 +503,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_contract_size_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves contract size of provided instrument.  # noqa: E501
+    def public_get_contract_size_get(self, instrument_name, **kwargs):
+        """Retrieves contract size of provided instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -536,10 +533,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_contract_size_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.public_get_contract_size_get_with_http_info(instrument_name, **kwargs)
 
-    def public_get_contract_size_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves contract size of provided instrument.  # noqa: E501
+    def public_get_contract_size_get_with_http_info(self, instrument_name, **kwargs):
+        """Retrieves contract size of provided instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -564,7 +561,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['instrument_name']  # noqa: E501
+        all_params = ['instrument_name']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -581,7 +578,7 @@ class PublicApi:
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_contract_size_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_contract_size_get`")
 
         collection_formats = {}
 
@@ -589,7 +586,7 @@ class PublicApi:
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
 
         header_params = {}
 
@@ -599,10 +596,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_contract_size', 'GET',
@@ -612,16 +609,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_currencies_get(self, **kwargs):  # noqa: E501
-        """Retrieves all cryptocurrencies supported by the API.  # noqa: E501
+    def public_get_currencies_get(self, **kwargs):
+        """Retrieves all cryptocurrencies supported by the API.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -641,10 +638,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_currencies_get_with_http_info(**kwargs)  # noqa: E501
+        return self.public_get_currencies_get_with_http_info(**kwargs)
 
-    def public_get_currencies_get_with_http_info(self, **kwargs):  # noqa: E501
-        """Retrieves all cryptocurrencies supported by the API.  # noqa: E501
+    def public_get_currencies_get_with_http_info(self, **kwargs):
+        """Retrieves all cryptocurrencies supported by the API.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -668,7 +665,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = []  # noqa: E501
+        all_params = []
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -697,10 +694,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_currencies', 'GET',
@@ -710,16 +707,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_funding_chart_data_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieve the latest user trades that have occurred for PERPETUAL instruments in a specific currency symbol and within given time range.  # noqa: E501
+    def public_get_funding_chart_data_get(self, instrument_name, **kwargs):
+        """Retrieve the latest user trades that have occurred for PERPETUAL instruments in a specific currency symbol and within given time range.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -741,10 +738,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_funding_chart_data_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.public_get_funding_chart_data_get_with_http_info(instrument_name, **kwargs)
 
-    def public_get_funding_chart_data_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieve the latest user trades that have occurred for PERPETUAL instruments in a specific currency symbol and within given time range.  # noqa: E501
+    def public_get_funding_chart_data_get_with_http_info(self, instrument_name, **kwargs):
+        """Retrieve the latest user trades that have occurred for PERPETUAL instruments in a specific currency symbol and within given time range.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -770,7 +767,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'length']  # noqa: E501
+        all_params = ['instrument_name', 'length']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -787,7 +784,7 @@ class PublicApi:
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_funding_chart_data_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_funding_chart_data_get`")
 
         collection_formats = {}
 
@@ -795,9 +792,9 @@ class PublicApi:
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'length' in local_var_params:
-            query_params.append(('length', local_var_params['length']))  # noqa: E501
+            query_params.append(('length', local_var_params['length']))
 
         header_params = {}
 
@@ -807,10 +804,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_funding_chart_data', 'GET',
@@ -820,16 +817,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_historical_volatility_get(self, currency, **kwargs):  # noqa: E501
-        """Provides information about historical volatility for given cryptocurrency.  # noqa: E501
+    def public_get_historical_volatility_get(self, currency, **kwargs):
+        """Provides information about historical volatility for given cryptocurrency.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -850,10 +847,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_historical_volatility_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.public_get_historical_volatility_get_with_http_info(currency, **kwargs)
 
-    def public_get_historical_volatility_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Provides information about historical volatility for given cryptocurrency.  # noqa: E501
+    def public_get_historical_volatility_get_with_http_info(self, currency, **kwargs):
+        """Provides information about historical volatility for given cryptocurrency.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -878,7 +875,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['currency']  # noqa: E501
+        all_params = ['currency']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -895,7 +892,7 @@ class PublicApi:
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_historical_volatility_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_historical_volatility_get`")
 
         collection_formats = {}
 
@@ -903,7 +900,7 @@ class PublicApi:
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
 
         header_params = {}
 
@@ -913,10 +910,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_historical_volatility', 'GET',
@@ -926,16 +923,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_index_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieves the current index price for the instruments, for the selected currency.  # noqa: E501
+    def public_get_index_get(self, currency, **kwargs):
+        """Retrieves the current index price for the instruments, for the selected currency.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -956,10 +953,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_index_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.public_get_index_get_with_http_info(currency, **kwargs)
 
-    def public_get_index_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieves the current index price for the instruments, for the selected currency.  # noqa: E501
+    def public_get_index_get_with_http_info(self, currency, **kwargs):
+        """Retrieves the current index price for the instruments, for the selected currency.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -984,7 +981,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['currency']  # noqa: E501
+        all_params = ['currency']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1001,7 +998,7 @@ class PublicApi:
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_index_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_index_get`")
 
         collection_formats = {}
 
@@ -1009,7 +1006,7 @@ class PublicApi:
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
 
         header_params = {}
 
@@ -1019,10 +1016,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_index', 'GET',
@@ -1032,16 +1029,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_instruments_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieves available trading instruments. This method can be used to see which instruments are available for trading, or which instruments have existed historically.  # noqa: E501
+    def public_get_instruments_get(self, currency, **kwargs):
+        """Retrieves available trading instruments. This method can be used to see which instruments are available for trading, or which instruments have existed historically.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1064,10 +1061,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_instruments_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.public_get_instruments_get_with_http_info(currency, **kwargs)
 
-    def public_get_instruments_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieves available trading instruments. This method can be used to see which instruments are available for trading, or which instruments have existed historically.  # noqa: E501
+    def public_get_instruments_get_with_http_info(self, currency, **kwargs):
+        """Retrieves available trading instruments. This method can be used to see which instruments are available for trading, or which instruments have existed historically.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1094,7 +1091,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['currency', 'kind', 'expired']  # noqa: E501
+        all_params = ['currency', 'kind', 'expired']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1111,7 +1108,7 @@ class PublicApi:
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_instruments_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_instruments_get`")
 
         collection_formats = {}
 
@@ -1119,11 +1116,11 @@ class PublicApi:
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'kind' in local_var_params:
-            query_params.append(('kind', local_var_params['kind']))  # noqa: E501
+            query_params.append(('kind', local_var_params['kind']))
         if 'expired' in local_var_params:
-            query_params.append(('expired', local_var_params['expired']))  # noqa: E501
+            query_params.append(('expired', local_var_params['expired']))
 
         header_params = {}
 
@@ -1133,10 +1130,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_instruments', 'GET',
@@ -1146,16 +1143,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_last_settlements_by_currency_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieves historical settlement, delivery and bankruptcy events coming from all instruments within given currency.  # noqa: E501
+    def public_get_last_settlements_by_currency_get(self, currency, **kwargs):
+        """Retrieves historical settlement, delivery and bankruptcy events coming from all instruments within given currency.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1180,10 +1177,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_last_settlements_by_currency_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.public_get_last_settlements_by_currency_get_with_http_info(currency, **kwargs)
 
-    def public_get_last_settlements_by_currency_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieves historical settlement, delivery and bankruptcy events coming from all instruments within given currency.  # noqa: E501
+    def public_get_last_settlements_by_currency_get_with_http_info(self, currency, **kwargs):
+        """Retrieves historical settlement, delivery and bankruptcy events coming from all instruments within given currency.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1212,7 +1209,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['currency', 'type', 'count', 'continuation', 'search_start_timestamp']  # noqa: E501
+        all_params = ['currency', 'type', 'count', 'continuation', 'search_start_timestamp']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1229,7 +1226,7 @@ class PublicApi:
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_last_settlements_by_currency_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_last_settlements_by_currency_get`")
 
         collection_formats = {}
 
@@ -1237,15 +1234,15 @@ class PublicApi:
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'continuation' in local_var_params:
-            query_params.append(('continuation', local_var_params['continuation']))  # noqa: E501
+            query_params.append(('continuation', local_var_params['continuation']))
         if 'search_start_timestamp' in local_var_params:
-            query_params.append(('search_start_timestamp', local_var_params['search_start_timestamp']))  # noqa: E501
+            query_params.append(('search_start_timestamp', local_var_params['search_start_timestamp']))
 
         header_params = {}
 
@@ -1255,10 +1252,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_last_settlements_by_currency', 'GET',
@@ -1268,16 +1265,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_last_settlements_by_instrument_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves historical public settlement, delivery and bankruptcy events filtered by instrument name.  # noqa: E501
+    def public_get_last_settlements_by_instrument_get(self, instrument_name, **kwargs):
+        """Retrieves historical public settlement, delivery and bankruptcy events filtered by instrument name.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1302,10 +1299,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_last_settlements_by_instrument_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.public_get_last_settlements_by_instrument_get_with_http_info(instrument_name, **kwargs)
 
-    def public_get_last_settlements_by_instrument_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves historical public settlement, delivery and bankruptcy events filtered by instrument name.  # noqa: E501
+    def public_get_last_settlements_by_instrument_get_with_http_info(self, instrument_name, **kwargs):
+        """Retrieves historical public settlement, delivery and bankruptcy events filtered by instrument name.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1334,7 +1331,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'type', 'count', 'continuation', 'search_start_timestamp']  # noqa: E501
+        all_params = ['instrument_name', 'type', 'count', 'continuation', 'search_start_timestamp']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1351,7 +1348,7 @@ class PublicApi:
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_last_settlements_by_instrument_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_last_settlements_by_instrument_get`")
 
         collection_formats = {}
 
@@ -1359,15 +1356,15 @@ class PublicApi:
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'type' in local_var_params:
-            query_params.append(('type', local_var_params['type']))  # noqa: E501
+            query_params.append(('type', local_var_params['type']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'continuation' in local_var_params:
-            query_params.append(('continuation', local_var_params['continuation']))  # noqa: E501
+            query_params.append(('continuation', local_var_params['continuation']))
         if 'search_start_timestamp' in local_var_params:
-            query_params.append(('search_start_timestamp', local_var_params['search_start_timestamp']))  # noqa: E501
+            query_params.append(('search_start_timestamp', local_var_params['search_start_timestamp']))
 
         header_params = {}
 
@@ -1377,10 +1374,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_last_settlements_by_instrument', 'GET',
@@ -1390,16 +1387,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_last_trades_by_currency_and_time_get(self, currency, start_timestamp, end_timestamp, **kwargs):  # noqa: E501
-        """Retrieve the latest trades that have occurred for instruments in a specific currency symbol and within given time range.  # noqa: E501
+    def public_get_last_trades_by_currency_and_time_get(self, currency, start_timestamp, end_timestamp, **kwargs):
+        """Retrieve the latest trades that have occurred for instruments in a specific currency symbol and within given time range.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1426,10 +1423,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_last_trades_by_currency_and_time_get_with_http_info(currency, start_timestamp, end_timestamp, **kwargs)  # noqa: E501
+        return self.public_get_last_trades_by_currency_and_time_get_with_http_info(currency, start_timestamp, end_timestamp, **kwargs)
 
-    def public_get_last_trades_by_currency_and_time_get_with_http_info(self, currency, start_timestamp, end_timestamp, **kwargs):  # noqa: E501
-        """Retrieve the latest trades that have occurred for instruments in a specific currency symbol and within given time range.  # noqa: E501
+    def public_get_last_trades_by_currency_and_time_get_with_http_info(self, currency, start_timestamp, end_timestamp, **kwargs):
+        """Retrieve the latest trades that have occurred for instruments in a specific currency symbol and within given time range.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1460,7 +1457,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['currency', 'start_timestamp', 'end_timestamp', 'kind', 'count', 'include_old', 'sorting']  # noqa: E501
+        all_params = ['currency', 'start_timestamp', 'end_timestamp', 'kind', 'count', 'include_old', 'sorting']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1477,15 +1474,15 @@ class PublicApi:
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_last_trades_by_currency_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_last_trades_by_currency_and_time_get`")
         # verify the required parameter 'start_timestamp' is set
         if ('start_timestamp' not in local_var_params or
                 local_var_params['start_timestamp'] is None):
-            raise ApiValueError("Missing the required parameter `start_timestamp` when calling `public_get_last_trades_by_currency_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `start_timestamp` when calling `public_get_last_trades_by_currency_and_time_get`")
         # verify the required parameter 'end_timestamp' is set
         if ('end_timestamp' not in local_var_params or
                 local_var_params['end_timestamp'] is None):
-            raise ApiValueError("Missing the required parameter `end_timestamp` when calling `public_get_last_trades_by_currency_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `end_timestamp` when calling `public_get_last_trades_by_currency_and_time_get`")
 
         collection_formats = {}
 
@@ -1493,19 +1490,19 @@ class PublicApi:
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'kind' in local_var_params:
-            query_params.append(('kind', local_var_params['kind']))  # noqa: E501
+            query_params.append(('kind', local_var_params['kind']))
         if 'start_timestamp' in local_var_params:
-            query_params.append(('start_timestamp', local_var_params['start_timestamp']))  # noqa: E501
+            query_params.append(('start_timestamp', local_var_params['start_timestamp']))
         if 'end_timestamp' in local_var_params:
-            query_params.append(('end_timestamp', local_var_params['end_timestamp']))  # noqa: E501
+            query_params.append(('end_timestamp', local_var_params['end_timestamp']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'include_old' in local_var_params:
-            query_params.append(('include_old', local_var_params['include_old']))  # noqa: E501
+            query_params.append(('include_old', local_var_params['include_old']))
         if 'sorting' in local_var_params:
-            query_params.append(('sorting', local_var_params['sorting']))  # noqa: E501
+            query_params.append(('sorting', local_var_params['sorting']))
 
         header_params = {}
 
@@ -1515,10 +1512,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_last_trades_by_currency_and_time', 'GET',
@@ -1528,16 +1525,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_last_trades_by_currency_get(self, currency, **kwargs):  # noqa: E501
-        """Retrieve the latest trades that have occurred for instruments in a specific currency symbol.  # noqa: E501
+    def public_get_last_trades_by_currency_get(self, currency, **kwargs):
+        """Retrieve the latest trades that have occurred for instruments in a specific currency symbol.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1564,10 +1561,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_last_trades_by_currency_get_with_http_info(currency, **kwargs)  # noqa: E501
+        return self.public_get_last_trades_by_currency_get_with_http_info(currency, **kwargs)
 
-    def public_get_last_trades_by_currency_get_with_http_info(self, currency, **kwargs):  # noqa: E501
-        """Retrieve the latest trades that have occurred for instruments in a specific currency symbol.  # noqa: E501
+    def public_get_last_trades_by_currency_get_with_http_info(self, currency, **kwargs):
+        """Retrieve the latest trades that have occurred for instruments in a specific currency symbol.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1598,7 +1595,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['currency', 'kind', 'start_id', 'end_id', 'count', 'include_old', 'sorting']  # noqa: E501
+        all_params = ['currency', 'kind', 'start_id', 'end_id', 'count', 'include_old', 'sorting']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1615,7 +1612,7 @@ class PublicApi:
         # verify the required parameter 'currency' is set
         if ('currency' not in local_var_params or
                 local_var_params['currency'] is None):
-            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_last_trades_by_currency_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `currency` when calling `public_get_last_trades_by_currency_get`")
 
         collection_formats = {}
 
@@ -1623,19 +1620,19 @@ class PublicApi:
 
         query_params = []
         if 'currency' in local_var_params:
-            query_params.append(('currency', local_var_params['currency']))  # noqa: E501
+            query_params.append(('currency', local_var_params['currency']))
         if 'kind' in local_var_params:
-            query_params.append(('kind', local_var_params['kind']))  # noqa: E501
+            query_params.append(('kind', local_var_params['kind']))
         if 'start_id' in local_var_params:
-            query_params.append(('start_id', local_var_params['start_id']))  # noqa: E501
+            query_params.append(('start_id', local_var_params['start_id']))
         if 'end_id' in local_var_params:
-            query_params.append(('end_id', local_var_params['end_id']))  # noqa: E501
+            query_params.append(('end_id', local_var_params['end_id']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'include_old' in local_var_params:
-            query_params.append(('include_old', local_var_params['include_old']))  # noqa: E501
+            query_params.append(('include_old', local_var_params['include_old']))
         if 'sorting' in local_var_params:
-            query_params.append(('sorting', local_var_params['sorting']))  # noqa: E501
+            query_params.append(('sorting', local_var_params['sorting']))
 
         header_params = {}
 
@@ -1645,10 +1642,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_last_trades_by_currency', 'GET',
@@ -1658,16 +1655,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_last_trades_by_instrument_and_time_get(self, instrument_name, start_timestamp, end_timestamp, **kwargs):  # noqa: E501
-        """Retrieve the latest trades that have occurred for a specific instrument and within given time range.  # noqa: E501
+    def public_get_last_trades_by_instrument_and_time_get(self, instrument_name, start_timestamp, end_timestamp, **kwargs):
+        """Retrieve the latest trades that have occurred for a specific instrument and within given time range.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1693,10 +1690,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_last_trades_by_instrument_and_time_get_with_http_info(instrument_name, start_timestamp, end_timestamp, **kwargs)  # noqa: E501
+        return self.public_get_last_trades_by_instrument_and_time_get_with_http_info(instrument_name, start_timestamp, end_timestamp, **kwargs)
 
-    def public_get_last_trades_by_instrument_and_time_get_with_http_info(self, instrument_name, start_timestamp, end_timestamp, **kwargs):  # noqa: E501
-        """Retrieve the latest trades that have occurred for a specific instrument and within given time range.  # noqa: E501
+    def public_get_last_trades_by_instrument_and_time_get_with_http_info(self, instrument_name, start_timestamp, end_timestamp, **kwargs):
+        """Retrieve the latest trades that have occurred for a specific instrument and within given time range.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1726,7 +1723,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'start_timestamp', 'end_timestamp', 'count', 'include_old', 'sorting']  # noqa: E501
+        all_params = ['instrument_name', 'start_timestamp', 'end_timestamp', 'count', 'include_old', 'sorting']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1743,15 +1740,15 @@ class PublicApi:
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_last_trades_by_instrument_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_last_trades_by_instrument_and_time_get`")
         # verify the required parameter 'start_timestamp' is set
         if ('start_timestamp' not in local_var_params or
                 local_var_params['start_timestamp'] is None):
-            raise ApiValueError("Missing the required parameter `start_timestamp` when calling `public_get_last_trades_by_instrument_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `start_timestamp` when calling `public_get_last_trades_by_instrument_and_time_get`")
         # verify the required parameter 'end_timestamp' is set
         if ('end_timestamp' not in local_var_params or
                 local_var_params['end_timestamp'] is None):
-            raise ApiValueError("Missing the required parameter `end_timestamp` when calling `public_get_last_trades_by_instrument_and_time_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `end_timestamp` when calling `public_get_last_trades_by_instrument_and_time_get`")
 
         collection_formats = {}
 
@@ -1759,17 +1756,17 @@ class PublicApi:
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'start_timestamp' in local_var_params:
-            query_params.append(('start_timestamp', local_var_params['start_timestamp']))  # noqa: E501
+            query_params.append(('start_timestamp', local_var_params['start_timestamp']))
         if 'end_timestamp' in local_var_params:
-            query_params.append(('end_timestamp', local_var_params['end_timestamp']))  # noqa: E501
+            query_params.append(('end_timestamp', local_var_params['end_timestamp']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'include_old' in local_var_params:
-            query_params.append(('include_old', local_var_params['include_old']))  # noqa: E501
+            query_params.append(('include_old', local_var_params['include_old']))
         if 'sorting' in local_var_params:
-            query_params.append(('sorting', local_var_params['sorting']))  # noqa: E501
+            query_params.append(('sorting', local_var_params['sorting']))
 
         header_params = {}
 
@@ -1779,10 +1776,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_last_trades_by_instrument_and_time', 'GET',
@@ -1792,16 +1789,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_last_trades_by_instrument_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieve the latest trades that have occurred for a specific instrument.  # noqa: E501
+    def public_get_last_trades_by_instrument_get(self, instrument_name, **kwargs):
+        """Retrieve the latest trades that have occurred for a specific instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1827,10 +1824,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_last_trades_by_instrument_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.public_get_last_trades_by_instrument_get_with_http_info(instrument_name, **kwargs)
 
-    def public_get_last_trades_by_instrument_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieve the latest trades that have occurred for a specific instrument.  # noqa: E501
+    def public_get_last_trades_by_instrument_get_with_http_info(self, instrument_name, **kwargs):
+        """Retrieve the latest trades that have occurred for a specific instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1860,7 +1857,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'start_seq', 'end_seq', 'count', 'include_old', 'sorting']  # noqa: E501
+        all_params = ['instrument_name', 'start_seq', 'end_seq', 'count', 'include_old', 'sorting']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1877,7 +1874,7 @@ class PublicApi:
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_last_trades_by_instrument_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_last_trades_by_instrument_get`")
 
         collection_formats = {}
 
@@ -1885,17 +1882,17 @@ class PublicApi:
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'start_seq' in local_var_params:
-            query_params.append(('start_seq', local_var_params['start_seq']))  # noqa: E501
+            query_params.append(('start_seq', local_var_params['start_seq']))
         if 'end_seq' in local_var_params:
-            query_params.append(('end_seq', local_var_params['end_seq']))  # noqa: E501
+            query_params.append(('end_seq', local_var_params['end_seq']))
         if 'count' in local_var_params:
-            query_params.append(('count', local_var_params['count']))  # noqa: E501
+            query_params.append(('count', local_var_params['count']))
         if 'include_old' in local_var_params:
-            query_params.append(('include_old', local_var_params['include_old']))  # noqa: E501
+            query_params.append(('include_old', local_var_params['include_old']))
         if 'sorting' in local_var_params:
-            query_params.append(('sorting', local_var_params['sorting']))  # noqa: E501
+            query_params.append(('sorting', local_var_params['sorting']))
 
         header_params = {}
 
@@ -1905,10 +1902,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_last_trades_by_instrument', 'GET',
@@ -1918,16 +1915,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_order_book_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves the order book, along with other market values for a given instrument.  # noqa: E501
+    def public_get_order_book_get(self, instrument_name, **kwargs):
+        """Retrieves the order book, along with other market values for a given instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1949,10 +1946,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_order_book_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.public_get_order_book_get_with_http_info(instrument_name, **kwargs)
 
-    def public_get_order_book_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Retrieves the order book, along with other market values for a given instrument.  # noqa: E501
+    def public_get_order_book_get_with_http_info(self, instrument_name, **kwargs):
+        """Retrieves the order book, along with other market values for a given instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -1978,7 +1975,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'depth']  # noqa: E501
+        all_params = ['instrument_name', 'depth']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -1995,7 +1992,7 @@ class PublicApi:
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_order_book_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_order_book_get`")
 
         collection_formats = {}
 
@@ -2003,9 +2000,9 @@ class PublicApi:
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'depth' in local_var_params:
-            query_params.append(('depth', local_var_params['depth']))  # noqa: E501
+            query_params.append(('depth', local_var_params['depth']))
 
         header_params = {}
 
@@ -2015,10 +2012,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_order_book', 'GET',
@@ -2028,16 +2025,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_time_get(self, **kwargs):  # noqa: E501
-        """Retrieves the current time (in milliseconds). This API endpoint can be used to check the clock skew between your software and Deribit's systems.  # noqa: E501
+    def public_get_time_get(self, **kwargs):
+        """Retrieves the current time (in milliseconds). This API endpoint can be used to check the clock skew between your software and Deribit's systems.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2057,10 +2054,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_time_get_with_http_info(**kwargs)  # noqa: E501
+        return self.public_get_time_get_with_http_info(**kwargs)
 
-    def public_get_time_get_with_http_info(self, **kwargs):  # noqa: E501
-        """Retrieves the current time (in milliseconds). This API endpoint can be used to check the clock skew between your software and Deribit's systems.  # noqa: E501
+    def public_get_time_get_with_http_info(self, **kwargs):
+        """Retrieves the current time (in milliseconds). This API endpoint can be used to check the clock skew between your software and Deribit's systems.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2084,7 +2081,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = []  # noqa: E501
+        all_params = []
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2113,10 +2110,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_time', 'GET',
@@ -2126,16 +2123,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_trade_volumes_get(self, **kwargs):  # noqa: E501
-        """Retrieves aggregated 24h trade volumes for different instrument types and currencies.  # noqa: E501
+    def public_get_trade_volumes_get(self, **kwargs):
+        """Retrieves aggregated 24h trade volumes for different instrument types and currencies.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2155,10 +2152,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_trade_volumes_get_with_http_info(**kwargs)  # noqa: E501
+        return self.public_get_trade_volumes_get_with_http_info(**kwargs)
 
-    def public_get_trade_volumes_get_with_http_info(self, **kwargs):  # noqa: E501
-        """Retrieves aggregated 24h trade volumes for different instrument types and currencies.  # noqa: E501
+    def public_get_trade_volumes_get_with_http_info(self, **kwargs):
+        """Retrieves aggregated 24h trade volumes for different instrument types and currencies.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2182,7 +2179,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = []  # noqa: E501
+        all_params = []
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2211,10 +2208,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_trade_volumes', 'GET',
@@ -2224,16 +2221,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_get_tradingview_chart_data_get(self, instrument_name, start_timestamp, end_timestamp, **kwargs):  # noqa: E501
-        """Publicly available market data used to generate a TradingView candle chart.  # noqa: E501
+    def public_get_tradingview_chart_data_get(self, instrument_name, start_timestamp, end_timestamp, **kwargs):
+        """Publicly available market data used to generate a TradingView candle chart.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2256,10 +2253,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_get_tradingview_chart_data_get_with_http_info(instrument_name, start_timestamp, end_timestamp, **kwargs)  # noqa: E501
+        return self.public_get_tradingview_chart_data_get_with_http_info(instrument_name, start_timestamp, end_timestamp, **kwargs)
 
-    def public_get_tradingview_chart_data_get_with_http_info(self, instrument_name, start_timestamp, end_timestamp, **kwargs):  # noqa: E501
-        """Publicly available market data used to generate a TradingView candle chart.  # noqa: E501
+    def public_get_tradingview_chart_data_get_with_http_info(self, instrument_name, start_timestamp, end_timestamp, **kwargs):
+        """Publicly available market data used to generate a TradingView candle chart.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2286,7 +2283,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['instrument_name', 'start_timestamp', 'end_timestamp']  # noqa: E501
+        all_params = ['instrument_name', 'start_timestamp', 'end_timestamp']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2303,15 +2300,15 @@ class PublicApi:
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_tradingview_chart_data_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_get_tradingview_chart_data_get`")
         # verify the required parameter 'start_timestamp' is set
         if ('start_timestamp' not in local_var_params or
                 local_var_params['start_timestamp'] is None):
-            raise ApiValueError("Missing the required parameter `start_timestamp` when calling `public_get_tradingview_chart_data_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `start_timestamp` when calling `public_get_tradingview_chart_data_get`")
         # verify the required parameter 'end_timestamp' is set
         if ('end_timestamp' not in local_var_params or
                 local_var_params['end_timestamp'] is None):
-            raise ApiValueError("Missing the required parameter `end_timestamp` when calling `public_get_tradingview_chart_data_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `end_timestamp` when calling `public_get_tradingview_chart_data_get`")
 
         collection_formats = {}
 
@@ -2319,11 +2316,11 @@ class PublicApi:
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
         if 'start_timestamp' in local_var_params:
-            query_params.append(('start_timestamp', local_var_params['start_timestamp']))  # noqa: E501
+            query_params.append(('start_timestamp', local_var_params['start_timestamp']))
         if 'end_timestamp' in local_var_params:
-            query_params.append(('end_timestamp', local_var_params['end_timestamp']))  # noqa: E501
+            query_params.append(('end_timestamp', local_var_params['end_timestamp']))
 
         header_params = {}
 
@@ -2333,10 +2330,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/get_tradingview_chart_data', 'GET',
@@ -2346,16 +2343,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_test_get(self, **kwargs):  # noqa: E501
-        """Tests the connection to the API server, and returns its version. You can use this to make sure the API is reachable, and matches the expected version.  # noqa: E501
+    def public_test_get(self, **kwargs):
+        """Tests the connection to the API server, and returns its version. You can use this to make sure the API is reachable, and matches the expected version.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2376,10 +2373,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_test_get_with_http_info(**kwargs)  # noqa: E501
+        return self.public_test_get_with_http_info(**kwargs)
 
-    def public_test_get_with_http_info(self, **kwargs):  # noqa: E501
-        """Tests the connection to the API server, and returns its version. You can use this to make sure the API is reachable, and matches the expected version.  # noqa: E501
+    def public_test_get_with_http_info(self, **kwargs):
+        """Tests the connection to the API server, and returns its version. You can use this to make sure the API is reachable, and matches the expected version.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2404,7 +2401,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['expected_result']  # noqa: E501
+        all_params = ['expected_result']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2425,7 +2422,7 @@ class PublicApi:
 
         query_params = []
         if 'expected_result' in local_var_params:
-            query_params.append(('expected_result', local_var_params['expected_result']))  # noqa: E501
+            query_params.append(('expected_result', local_var_params['expected_result']))
 
         header_params = {}
 
@@ -2435,10 +2432,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/test', 'GET',
@@ -2448,16 +2445,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_ticker_get(self, instrument_name, **kwargs):  # noqa: E501
-        """Get ticker for an instrument.  # noqa: E501
+    def public_ticker_get(self, instrument_name, **kwargs):
+        """Get ticker for an instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2478,10 +2475,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_ticker_get_with_http_info(instrument_name, **kwargs)  # noqa: E501
+        return self.public_ticker_get_with_http_info(instrument_name, **kwargs)
 
-    def public_ticker_get_with_http_info(self, instrument_name, **kwargs):  # noqa: E501
-        """Get ticker for an instrument.  # noqa: E501
+    def public_ticker_get_with_http_info(self, instrument_name, **kwargs):
+        """Get ticker for an instrument.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2506,7 +2503,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['instrument_name']  # noqa: E501
+        all_params = ['instrument_name']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2523,7 +2520,7 @@ class PublicApi:
         # verify the required parameter 'instrument_name' is set
         if ('instrument_name' not in local_var_params or
                 local_var_params['instrument_name'] is None):
-            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_ticker_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `instrument_name` when calling `public_ticker_get`")
 
         collection_formats = {}
 
@@ -2531,7 +2528,7 @@ class PublicApi:
 
         query_params = []
         if 'instrument_name' in local_var_params:
-            query_params.append(('instrument_name', local_var_params['instrument_name']))  # noqa: E501
+            query_params.append(('instrument_name', local_var_params['instrument_name']))
 
         header_params = {}
 
@@ -2541,10 +2538,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/ticker', 'GET',
@@ -2554,16 +2551,16 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
 
-    def public_validate_field_get(self, field, value, **kwargs):  # noqa: E501
-        """Method used to introduce the client software connected to Deribit platform over websocket. Provided data may have an impact on the maintained connection and will be collected for internal statistical purposes. In response, Deribit will also introduce itself.  # noqa: E501
+    def public_validate_field_get(self, field, value, **kwargs):
+        """Method used to introduce the client software connected to Deribit platform over websocket. Provided data may have an impact on the maintained connection and will be collected for internal statistical purposes. In response, Deribit will also introduce itself.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2586,10 +2583,10 @@ class PublicApi:
                  returns the request thread.
         """
         kwargs['_return_http_data_only'] = True
-        return self.public_validate_field_get_with_http_info(field, value, **kwargs)  # noqa: E501
+        return self.public_validate_field_get_with_http_info(field, value, **kwargs)
 
-    def public_validate_field_get_with_http_info(self, field, value, **kwargs):  # noqa: E501
-        """Method used to introduce the client software connected to Deribit platform over websocket. Provided data may have an impact on the maintained connection and will be collected for internal statistical purposes. In response, Deribit will also introduce itself.  # noqa: E501
+    def public_validate_field_get_with_http_info(self, field, value, **kwargs):
+        """Method used to introduce the client software connected to Deribit platform over websocket. Provided data may have an impact on the maintained connection and will be collected for internal statistical purposes. In response, Deribit will also introduce itself.
 
         This method makes a synchronous HTTP request by default. To make an
         asynchronous HTTP request, please pass async_req=True
@@ -2616,7 +2613,7 @@ class PublicApi:
 
         local_var_params = locals()
 
-        all_params = ['field', 'value', 'value2']  # noqa: E501
+        all_params = ['field', 'value', 'value2']
         all_params.append('async_req')
         all_params.append('_return_http_data_only')
         all_params.append('_preload_content')
@@ -2633,11 +2630,11 @@ class PublicApi:
         # verify the required parameter 'field' is set
         if ('field' not in local_var_params or
                 local_var_params['field'] is None):
-            raise ApiValueError("Missing the required parameter `field` when calling `public_validate_field_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `field` when calling `public_validate_field_get`")
         # verify the required parameter 'value' is set
         if ('value' not in local_var_params or
                 local_var_params['value'] is None):
-            raise ApiValueError("Missing the required parameter `value` when calling `public_validate_field_get`")  # noqa: E501
+            raise ApiValueError("Missing the required parameter `value` when calling `public_validate_field_get`")
 
         collection_formats = {}
 
@@ -2645,11 +2642,11 @@ class PublicApi:
 
         query_params = []
         if 'field' in local_var_params:
-            query_params.append(('field', local_var_params['field']))  # noqa: E501
+            query_params.append(('field', local_var_params['field']))
         if 'value' in local_var_params:
-            query_params.append(('value', local_var_params['value']))  # noqa: E501
+            query_params.append(('value', local_var_params['value']))
         if 'value2' in local_var_params:
-            query_params.append(('value2', local_var_params['value2']))  # noqa: E501
+            query_params.append(('value2', local_var_params['value2']))
 
         header_params = {}
 
@@ -2659,10 +2656,10 @@ class PublicApi:
         body_params = None
         # HTTP header `Accept`
         header_params['Accept'] = self.api_client.select_header_accept(
-            ['application/json'])  # noqa: E501
+            ['application/json'])
 
         # Authentication setting
-        auth_settings = ['bearerAuth']  # noqa: E501
+        auth_settings = ['bearerAuth']
 
         return self.api_client.call_api(
             '/public/validate_field', 'GET',
@@ -2672,10 +2669,10 @@ class PublicApi:
             body=body_params,
             post_params=form_params,
             files=local_var_files,
-            response_type='object',  # noqa: E501
+            response_type='object',
             auth_settings=auth_settings,
             async_req=local_var_params.get('async_req'),
-            _return_http_data_only=local_var_params.get('_return_http_data_only'),  # noqa: E501
+            _return_http_data_only=local_var_params.get('_return_http_data_only'),
             _preload_content=local_var_params.get('_preload_content', True),
             _request_timeout=local_var_params.get('_request_timeout'),
             collection_formats=collection_formats)
